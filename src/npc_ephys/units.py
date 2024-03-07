@@ -85,13 +85,13 @@ def get_amplitudes_waveforms_channels_ks25(
         templates_mean.append(_mean)
         _sd = _templates_sd[unit_index, :, :]
 
-        idx = np.where(_mean.any(axis=0))[0]
-        very_sparse_channel_indices = np.array(sparse_channel_indices)[idx]
-        templates_mean.append(_mean[:, idx])
-        templates_sd.append(_sd[:, idx])
+        idx_with_data = np.where(_mean.any(axis=0))[0]
+        very_sparse_channel_indices = np.array(sparse_channel_indices)[idx_with_data]
+        templates_mean.append(_mean[:, idx_with_data])
+        templates_sd.append(_sd[:, idx_with_data])
         peak_channels.append(np.intp(peak_channel))
         logger.debug(f"very_sparse_channel_indices: {very_sparse_channel_indices}")
-        channels.append(tuple(idx))  # TODO switch to very_sparse_channel_indices
+        channels.append(tuple(very_sparse_channel_indices))
 
     return AmplitudesWaveformsChannels(
         amplitudes=tuple(unit_amplitudes),
