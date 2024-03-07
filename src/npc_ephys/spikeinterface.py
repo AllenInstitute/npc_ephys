@@ -18,12 +18,11 @@ import npc_lims
 import npc_session
 import numpy as np
 import numpy.typing as npt
+import packaging.version
 import pandas as pd
 import upath
-from typing_extensions import TypeAlias
-
-import packaging.version
 import zarr
+from typing_extensions import TypeAlias
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +68,7 @@ class SpikeInterfaceKS25Data:
     S3Path('s3://codeocean-s3datasetsbucket-1u41qdg42ur9/83754308-0a91-4b54-af79-3c42f6bc831b')
 
     >>> si.template_metrics_dict('probeA')
-    {'metric_names': ['exp_decay', 'half_width', 'num_negative_peaks', 'num_positive_peaks', 'peak_to_valley', 'peak_trough_ratio', 'recovery_slope', 'repolarization_slope', 'spread', 'velocity_above', 'velocity_below'], 'sparsity': None, 'peak_sign': 'neg', 'upsampling_factor': 10, 'metrics_kwargs': {'recovery_window_ms': 0.7, 'peak_relative_threshold': 0.2, 'peak_width_ms': 0.1, 'depth_direction': 'y', 'min_channels_for_velocity': 5, 'min_r2_velocity': 0.5, 'exp_peak_function': 'ptp', 
+    {'metric_names': ['exp_decay', 'half_width', 'num_negative_peaks', 'num_positive_peaks', 'peak_to_valley', 'peak_trough_ratio', 'recovery_slope', 'repolarization_slope', 'spread', 'velocity_above', 'velocity_below'], 'sparsity': None, 'peak_sign': 'neg', 'upsampling_factor': 10, 'metrics_kwargs': {'recovery_window_ms': 0.7, 'peak_relative_threshold': 0.2, 'peak_width_ms': 0.1, 'depth_direction': 'y', 'min_channels_for_velocity': 5, 'min_r2_velocity': 0.5, 'exp_peak_function': 'ptp',
     'min_r2_exp_decay': 0.5, 'spread_threshold': 0.2, 'spread_smooth_um': 20, 'column_range': None}}
 
     >>> si.quality_metrics_df('probeA').columns
@@ -116,15 +115,18 @@ class SpikeInterfaceKS25Data:
     def is_nextflow_pipeline(self) -> bool:
         if self.root is not None:
             return any(f.name == "nextflow" for f in self.root.iterdir())
-        
+
         return False
-    
+
     @property
     def version(self) -> str:
         if not self.is_nextflow_pipeline:
-            return self.provenance(self.probes[0])["kwargs"]["parent_sorting"]["version"]
+            return self.provenance(self.probes[0])["kwargs"]["parent_sorting"][
+                "version"
+            ]
 
         return self.provenance(self.probes[0])["version"]
+
     @property
     def is_pre_v0_99(self) -> bool:
         return packaging.version.parse(self.version) < packaging.version.parse("0.99")
@@ -337,46 +339,59 @@ class SpikeInterfaceKS25Data:
             axis=0,
         )
 
-    def device_indices_in_nwb_units(self, probe: str | npc_session.ProbeRecord) -> npt.NDArray:
+    def device_indices_in_nwb_units(
+        self, probe: str | npc_session.ProbeRecord
+    ) -> npt.NDArray:
         probe = npc_session.ProbeRecord(probe)
-        devices = np.array([npc_session.ProbeRecord(device) for device in self.nwb['units/device_name'][:]])
+        devices = np.array(
+            [
+                npc_session.ProbeRecord(device)
+                for device in self.nwb["units/device_name"][:]
+            ]
+        )
 
         return np.argwhere(devices == probe).squeeze()
 
     def get_nwb_units_device_property(self, metric: str, probe: str) -> npt.NDArray:
-        return self.nwb[f'units/{metric}'][self.device_indices_in_nwb_units(probe)].squeeze()
+        return self.nwb[f"units/{metric}"][
+            self.device_indices_in_nwb_units(probe)
+        ].squeeze()
 
     @functools.cache
     def original_cluster_id(self, probe: str) -> npt.NDArray[np.int64]:
         """Array of cluster IDs, one per unit in unique('unit_indexes')"""
         if self.is_nextflow_pipeline:
-            return self.get_nwb_units_device_property('ks_unit_id', probe).astype(np.int64)
-        
+            return self.get_nwb_units_device_property("ks_unit_id", probe).astype(
+                np.int64
+            )
+
         with contextlib.suppress(FileNotFoundError):
             return np.array(
                 io.BytesIO(
                     self.get_correct_path(
-                    self.curated(probe),
-                    "properties",
-                    "original_cluster_id.npy",
-                ).read_bytes()
+                        self.curated(probe),
+                        "properties",
+                        "original_cluster_id.npy",
+                    ).read_bytes()
                 )
             )
-        
+
         if self.is_pre_v0_99:
             # TODO! verify this is correct
             return self.sorting_cached(probe)["unit_ids"]
-        
-        raise ValueError(f"Unknown format of sorted output for SI {self.version=}, {self.is_nextflow_pipeline=}. As of March 2024 only handles 0.100 and lower")
+
+        raise ValueError(
+            f"Unknown format of sorted output for SI {self.version=}, {self.is_nextflow_pipeline=}. As of March 2024 only handles 0.100 and lower"
+        )
 
     @property
     def nwb(self) -> zarr.Group:
         if not self.is_nextflow_pipeline:
-            raise ValueError(f"NWB not part of output from stand alone capsule")
-        
+            raise ValueError("NWB not part of output from stand alone capsule")
+
         assert self.root is not None
 
-        return zarr.open(next((self.root / 'nwb').glob('*.nwb')))
+        return zarr.open(next((self.root / "nwb").glob("*.nwb")))
 
     @functools.cache
     def default_qc(self, probe: str) -> npt.NDArray[np.floating]:
