@@ -223,7 +223,7 @@ def make_units_table_from_spike_interface_ks25(
     >>> device_timing_on_sync = npc_ephys.openephys.get_ephys_timing_on_sync(npc_lims.get_h5_sync_from_s3('662892_20230821'), npc_lims.get_recording_dirs_experiment_path_from_s3('662892_20230821'), only_devices_including='ProbeA')
     >>> units = make_units_table_from_spike_interface_ks25('662892_20230821', device_timing_on_sync)
     >>> len(units[units['electrode_group_name'] == 'probeA'])
-    237
+    225
     """
     spike_interface_data = npc_ephys.spikeinterface.get_spikeinterface_data(
         session_or_spikeinterface_data_or_path

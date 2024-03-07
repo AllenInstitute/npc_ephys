@@ -22,6 +22,9 @@ import pandas as pd
 import upath
 from typing_extensions import TypeAlias
 
+import packaging.version
+import zarr
+
 logger = logging.getLogger(__name__)
 
 SpikeInterfaceData: TypeAlias = Union[
@@ -39,7 +42,7 @@ def get_spikeinterface_data(
     """Return a SpikeInterfaceKS25Data object for a session.
 
     >>> paths = get_spikeinterface_data('668759_20230711')
-    >>> paths.root == get_spikeinterface_data('s3://codeocean-s3datasetsbucket-1u41qdg42ur9/4797cab2-9ea2-4747-8d15-5ba064837c1c').root
+    >>> paths.root == get_spikeinterface_data('s3://codeocean-s3datasetsbucket-1u41qdg42ur9/83754308-0a91-4b54-af79-3c42f6bc831b').root
     True
     """
     if isinstance(session_or_root_path, SpikeInterfaceKS25Data):
@@ -63,26 +66,32 @@ class SpikeInterfaceKS25Data:
     Provide a session ID or a root path:
     >>> si = SpikeInterfaceKS25Data('668759_20230711')
     >>> si.root
-    S3Path('s3://codeocean-s3datasetsbucket-1u41qdg42ur9/4797cab2-9ea2-4747-8d15-5ba064837c1c')
+    S3Path('s3://codeocean-s3datasetsbucket-1u41qdg42ur9/83754308-0a91-4b54-af79-3c42f6bc831b')
 
     >>> si.template_metrics_dict('probeA')
-    {'metric_names': ['peak_to_valley', 'peak_trough_ratio', 'half_width', 'repolarization_slope', 'recovery_slope'], 'sparsity': None, 'peak_sign': 'neg', 'upsampling_factor': 10, 'window_slope_ms': 0.7}
+    {'metric_names': ['exp_decay', 'half_width', 'num_negative_peaks', 'num_positive_peaks', 'peak_to_valley', 'peak_trough_ratio', 'recovery_slope', 'repolarization_slope', 'spread', 'velocity_above', 'velocity_below'], 'sparsity': None, 'peak_sign': 'neg', 'upsampling_factor': 10, 'metrics_kwargs': {'recovery_window_ms': 0.7, 'peak_relative_threshold': 0.2, 'peak_width_ms': 0.1, 'depth_direction': 'y', 'min_channels_for_velocity': 5, 'min_r2_velocity': 0.5, 'exp_peak_function': 'ptp', 
+    'min_r2_exp_decay': 0.5, 'spread_threshold': 0.2, 'spread_smooth_um': 20, 'column_range': None}}
 
     >>> si.quality_metrics_df('probeA').columns
-    Index(['num_spikes', 'firing_rate', 'presence_ratio', 'snr',
-           'isi_violations_ratio', 'isi_violations_count', 'rp_contamination',
-           'rp_violations', 'sliding_rp_violation', 'amplitude_cutoff',
-           'drift_ptp', 'drift_std', 'drift_mad', 'isolation_distance', 'l_ratio',
-           'd_prime'],
+    Index(['amplitude_cutoff', 'amplitude_cv_median', 'amplitude_cv_range',
+           'amplitude_median', 'drift_ptp', 'drift_std', 'drift_mad',
+           'firing_range', 'firing_rate', 'isi_violations_ratio',
+           'isi_violations_count', 'num_spikes', 'presence_ratio',
+           'rp_contamination', 'rp_violations', 'sliding_rp_violation', 'snr',
+           'sync_spike_2', 'sync_spike_4', 'sync_spike_8', 'd_prime',
+           'isolation_distance', 'l_ratio', 'silhouette', 'nn_hit_rate',
+           'nn_miss_rate'],
           dtype='object')
     >>> si.version
-    '0.97.1'
+    '0.100.0'
     >>> ''.join(si.probes)
-    'ABCEF'
+    'ABCDEF'
     >>> si.spike_indexes('probeA')
-    array([      491,       738,       835, ..., 143124925, 143125165, 143125201])
+    array([      145,       491,       738, ..., 143124925, 143125165, 143125201], dtype=int64)
     >>> si.unit_indexes('probeA')
-    array([ 56,  61, 161, ..., 151,  72,  59])
+    array([ 36,  50,  55, ...,  52, 132,  53], dtype=int64)
+    >>> len(si.original_cluster_id('probeA'))
+    139
     """
 
     session: str | npc_session.SessionRecord | None = None
@@ -104,12 +113,21 @@ class SpikeInterfaceKS25Data:
         return tuple(sorted(probes))
 
     @property
+    def is_nextflow_pipeline(self) -> bool:
+        if self.root is not None:
+            return any(f.name == "nextflow" for f in self.root.iterdir())
+        
+        return False
+    
+    @property
     def version(self) -> str:
-        return self.provenance(self.probes[0])["kwargs"]["parent_sorting"]["version"]
+        if not self.is_nextflow_pipeline:
+            return self.provenance(self.probes[0])["kwargs"]["parent_sorting"]["version"]
 
+        return self.provenance(self.probes[0])["version"]
     @property
     def is_pre_v0_99(self) -> bool:
-        return self.version < "0.99"
+        return packaging.version.parse(self.version) < packaging.version.parse("0.99")
 
     @staticmethod
     @functools.cache
@@ -319,21 +337,46 @@ class SpikeInterfaceKS25Data:
             axis=0,
         )
 
+    def device_indices_in_nwb_units(self, probe: str | npc_session.ProbeRecord) -> npt.NDArray:
+        probe = npc_session.ProbeRecord(probe)
+        devices = np.array([npc_session.ProbeRecord(device) for device in self.nwb['units/device_name'][:]])
+
+        return np.argwhere(devices == probe).squeeze()
+
+    def get_nwb_units_device_property(self, metric: str, probe: str) -> npt.NDArray:
+        return self.nwb[f'units/{metric}'][self.device_indices_in_nwb_units(probe)].squeeze()
+
     @functools.cache
     def original_cluster_id(self, probe: str) -> npt.NDArray[np.int64]:
         """Array of cluster IDs, one per unit in unique('unit_indexes')"""
-        if self.is_pre_v0_99:
-            # TODO! verify this is correct
-            return self.sorting_cached(probe)["unit_ids"]
-        return np.load(
-            io.BytesIO(
-                self.get_correct_path(
+        if self.is_nextflow_pipeline:
+            return self.get_nwb_units_device_property('ks_unit_id', probe).astype(np.int64)
+        
+        with contextlib.suppress(FileNotFoundError):
+            return np.array(
+                io.BytesIO(
+                    self.get_correct_path(
                     self.curated(probe),
                     "properties",
                     "original_cluster_id.npy",
                 ).read_bytes()
+                )
             )
-        )
+        
+        if self.is_pre_v0_99:
+            # TODO! verify this is correct
+            return self.sorting_cached(probe)["unit_ids"]
+        
+        raise ValueError(f"Unknown format of sorted output for SI {self.version=}, {self.is_nextflow_pipeline=}. As of March 2024 only handles 0.100 and lower")
+
+    @property
+    def nwb(self) -> zarr.Group:
+        if not self.is_nextflow_pipeline:
+            raise ValueError(f"NWB not part of output from stand alone capsule")
+        
+        assert self.root is not None
+
+        return zarr.open(next((self.root / 'nwb').glob('*.nwb')))
 
     @functools.cache
     def default_qc(self, probe: str) -> npt.NDArray[np.floating]:
