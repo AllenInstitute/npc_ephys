@@ -87,9 +87,9 @@ class SpikeInterfaceKS25Data:
     >>> ''.join(si.probes)
     'ABCDEF'
     >>> si.spike_indexes('probeA')
-    array([      145,       491,       738, ..., 143124925, 143125165, 143125201], dtype=int64)
+    array([      145,       491,       738, ..., 143124925, 143125165, 143125201])
     >>> si.unit_indexes('probeA')
-    array([ 36,  50,  55, ...,  52, 132,  53], dtype=int64)
+    array([ 36,  50,  55, ...,  52, 132,  53])
     >>> len(si.original_cluster_id('probeA'))
     139
     """
