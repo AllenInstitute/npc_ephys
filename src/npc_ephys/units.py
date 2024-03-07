@@ -62,8 +62,13 @@ def get_amplitudes_waveforms_channels_ks25(
     sparse_channel_indices = spike_interface_data.sparse_channel_indices(
         electrode_group_name
     )
-    _templates_mean = spike_interface_data.templates_average(electrode_group_name)
-    _templates_sd = spike_interface_data.templates_std(electrode_group_name)
+    if spike_interface_data.is_nextflow_pipeline:
+        # faster data access 
+        _templates_mean = spike_interface_data.get_nwb_units_device_property('waveform_mean', electrode_group_name)
+        _templates_sd = spike_interface_data.get_nwb_units_device_property('waveform_sd', electrode_group_name)
+    else:
+        _templates_mean = spike_interface_data.templates_average(electrode_group_name)
+        _templates_sd = spike_interface_data.templates_std(electrode_group_name)
 
     sparse_channel_indices = spike_interface_data.sparse_channel_indices(
         electrode_group_name
