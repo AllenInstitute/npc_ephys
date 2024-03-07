@@ -63,9 +63,13 @@ def get_amplitudes_waveforms_channels_ks25(
         electrode_group_name
     )
     if spike_interface_data.is_nextflow_pipeline:
-        # faster data access 
-        _templates_mean = spike_interface_data.get_nwb_units_device_property('waveform_mean', electrode_group_name)[..., sparse_channel_indices]
-        _templates_sd = spike_interface_data.get_nwb_units_device_property('waveform_sd', electrode_group_name)[..., sparse_channel_indices]
+        # faster data access
+        _templates_mean = spike_interface_data.get_nwb_units_device_property(
+            "waveform_mean", electrode_group_name
+        )[..., sparse_channel_indices]
+        _templates_sd = spike_interface_data.get_nwb_units_device_property(
+            "waveform_sd", electrode_group_name
+        )[..., sparse_channel_indices]
     else:
         _templates_mean = spike_interface_data.templates_average(electrode_group_name)
         _templates_sd = spike_interface_data.templates_std(electrode_group_name)
@@ -78,7 +82,9 @@ def get_amplitudes_waveforms_channels_ks25(
     ), f"Expected {len(sparse_channel_indices)=} channels to match {_templates_mean.shape[2]=}"
     for unit_index in range(_templates_mean.shape[0]):
         _mean = _templates_mean[unit_index, :, :]
-        pk_to_pk = np.max(_mean, axis=0) - np.min(_mean, axis=0) # same method as Allen ecephys pipeline:
+        pk_to_pk = np.max(_mean, axis=0) - np.min(
+            _mean, axis=0
+        )  # same method as Allen ecephys pipeline:
         # https://github.com/bjhardcastle/ecephys_spike_sorting/blob/7e567a6fc3fd2fc0eedef750b83b8b8a0d469544/ecephys_spike_sorting/modules/mean_waveforms/extract_waveforms.py#L87
         peak_channel = sparse_channel_indices[(m := np.argmax(pk_to_pk))]
         unit_amplitudes.append(pk_to_pk[m].item())
