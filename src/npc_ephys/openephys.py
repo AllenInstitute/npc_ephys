@@ -303,7 +303,7 @@ def get_ephys_data(
             )
         num_channels: int = device_metadata["num_channels"]
 
-        if not device.continuous.as_uri().startswith("file"):
+        if device.continuous.protocol in ("", "file"):
             # local file we can memory-map
             dat = np.load(device.continuous / "continuous.dat", mmap_mode="r")
         else:
