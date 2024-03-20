@@ -4,7 +4,6 @@ import concurrent.futures
 import dataclasses
 import logging
 from collections.abc import Iterable
-from typing import NamedTuple
 
 import npc_io
 import npc_session
@@ -39,6 +38,7 @@ def get_aligned_spike_times(
         spike_times / device_timing_on_sync.sampling_rate
     ) + device_timing_on_sync.start_time
 
+
 @dataclasses.dataclass()
 class AmplitudesWaveformsChannels:
     """Data class, each entry a sequence with len == N units"""
@@ -50,10 +50,15 @@ class AmplitudesWaveformsChannels:
     channels: tuple[tuple[np.intp, ...], ...]
 
     def __post_init__(self):
-        # check all attrs same length 
-        if not all(len(getattr(self, attr)) == len(getattr(self, next(iter(self.__annotations__.keys())))) for attr in self.__annotations__):
+        # check all attrs same length
+        if not all(
+            len(getattr(self, attr))
+            == len(getattr(self, next(iter(self.__annotations__.keys()))))
+            for attr in self.__annotations__
+        ):
             raise ValueError("All attributes must have same length")
-        
+
+
 def get_amplitudes_waveforms_channels_ks25(
     spike_interface_data: npc_ephys.spikeinterface.SpikeInterfaceKS25Data,
     electrode_group_name: str,
