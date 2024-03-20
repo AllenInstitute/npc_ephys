@@ -7,13 +7,13 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    "npc-sync>=0.1.5",
+    "npc-sync>=0.1.9",
     "zarr>=2.16.1",
     "pandas>=2.2.0",
     "tqdm>=4.66.1",
-    "npc-lims>=0.1.115",
+    "npc-lims>=0.1.134",
     "wavpack-numcodecs>=0.1.5",
-    "npc-io>=0.1.23",
+    "npc-io>=0.1.26",
 ]
 version = "0.1.11"
 classifiers = [
