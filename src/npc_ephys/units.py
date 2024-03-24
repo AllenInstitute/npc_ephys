@@ -200,9 +200,9 @@ def _device_helper(
             spike_times,
             device_timing_on_sync,
         )
-    else: 
+    else:
         spike_times_aligned = spike_times
-        
+
     unit_indexes = spike_interface_data.unit_indexes(electrode_group_name)
     units_x_spike_times = get_units_x_spike_times(
         spike_times=spike_times_aligned,

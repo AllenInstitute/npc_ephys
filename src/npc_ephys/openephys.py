@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_PROBES = "ABCDEF"
 TIMESTAMPS_ADJUSTED_FLAG_FILENAME = "TIMESTAMPS_ADJUSTED.flag"
 
+
 def get_sync_messages_data(
     sync_messages_path: npc_io.PathLike,
 ) -> dict[str, dict[Literal["start", "rate"], int]]:
@@ -88,7 +89,8 @@ class EphysDeviceInfo:
     @npc_io.cached_property
     def is_sync_adjusted(self) -> bool:
         """Check if the device's timestamps have been adjusted to the sync
-        clock. If one has been adjusted and the other hasn't, raise an AssertionError."""
+        clock. If one has been adjusted and the other hasn't, raise an AssertionError.
+        """
         continuous = (self.continuous / TIMESTAMPS_ADJUSTED_FLAG_FILENAME).exists()
         events = (self.events / TIMESTAMPS_ADJUSTED_FLAG_FILENAME).exists()
         if continuous != events:
@@ -97,6 +99,7 @@ class EphysDeviceInfo:
                 f"Continuous and events timestamps adjusted flags do not match in {self.continuous.parent} - one is adjusted, the other is not: {not_adjusted}"
             )
         return continuous
+
 
 class EphysTimingInfo(Protocol):
     @property
@@ -799,6 +802,7 @@ def validate_ephys(
             )
         logging.info(f"Validated ephys data in {root}")
 
+
 @dataclasses.dataclass
 class SyncAdjustedTimestamps:
     timing: EphysTimingInfoOnSync
@@ -807,7 +811,8 @@ class SyncAdjustedTimestamps:
     """Timestamps in seconds, relative to the start of the sync clock"""
     events: npt.ArrayLike
     """Timestamps in seconds, relative to the start of the sync clock"""
-    
+
+
 def get_adjusted_timestamps(
     ephys_timing: EphysTimingInfoOnSync,
 ) -> SyncAdjustedTimestamps:
@@ -830,39 +835,49 @@ def get_adjusted_timestamps(
         stop=ephys_timing.device.num_samples,
         dtype=np.float64,
     )
-    adjusted_continuous = (default_continuous / ephys_timing.sampling_rate) + ephys_timing.start_time
-    adjusted_events = (ephys_timing.device.ttl_sample_numbers / ephys_timing.sampling_rate) + ephys_timing.start_time
+    adjusted_continuous = (
+        default_continuous / ephys_timing.sampling_rate
+    ) + ephys_timing.start_time
+    adjusted_events = (
+        ephys_timing.device.ttl_sample_numbers / ephys_timing.sampling_rate
+    ) + ephys_timing.start_time
     return SyncAdjustedTimestamps(
         timing=ephys_timing,
         continuous=adjusted_continuous,
         events=adjusted_events,
     )
 
+
 def overwrite_timestamps(
     ephys_timing: Iterable[EphysTimingInfoOnSync],
 ) -> None:
     """Overwrite timestamps in the continuous and events folders with
     sync-adjusted versions.
-    
+
     - this allows spike-sorting output to be used directly
     """
     if not isinstance(ephys_timing, Iterable):
         ephys_timing = (ephys_timing,)
-        
+
     def overwrite(path: upath.UPath, data: npt.ArrayLike) -> None:
         assert path.exists(), f"{path} does not exist - check the path construction"
         flag = path.parent / TIMESTAMPS_ADJUSTED_FLAG_FILENAME
         if flag.exists():
-            raise FileExistsError(f"{flag} exists: timestamps have already been adjusted")
+            raise FileExistsError(
+                f"{flag} exists: timestamps have already been adjusted"
+            )
         logger.debug(f"Overwriting {path}")
         np.save(path, data)
         logger.debug("Creating flag file")
-        flag.write_text("Original timestamps.npy file has been overwritten with sync-adjusted timestamps")
-        
+        flag.write_text(
+            "Original timestamps.npy file has been overwritten with sync-adjusted timestamps"
+        )
+
     for info in ephys_timing:
         adjusted = get_adjusted_timestamps(info)
         overwrite(info.device.continuous / "timestamps.npy", adjusted.continuous)
         overwrite(info.device.events / "timestamps.npy", adjusted.events)
+
 
 if __name__ == "__main__":
     from npc_ephys import testmod
