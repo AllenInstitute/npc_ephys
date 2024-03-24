@@ -194,10 +194,15 @@ def _device_helper(
         df_device_metrics["waveform_sd"] = awc.templates_sd
         df_device_metrics["channels"] = awc.channels
 
-    spike_times_aligned = get_aligned_spike_times(
-        spike_interface_data.spike_indexes(electrode_group_name),
-        device_timing_on_sync,
-    )
+    spike_times = spike_interface_data.spike_indexes(electrode_group_name)
+    if not device_timing_on_sync.device.is_sync_adjusted:
+        spike_times_aligned = get_aligned_spike_times(
+            spike_times,
+            device_timing_on_sync,
+        )
+    else: 
+        spike_times_aligned = spike_times
+        
     unit_indexes = spike_interface_data.unit_indexes(electrode_group_name)
     units_x_spike_times = get_units_x_spike_times(
         spike_times=spike_times_aligned,
