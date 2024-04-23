@@ -317,10 +317,11 @@ def get_ephys_data(
                 f"Could not find device metadata for {device.name}: looked for `structure.oebin` files in {recording_dirs}"
             )
         num_channels: int = device_metadata["num_channels"]
-
+        
+        dat: npt.ArrayLike[np.int16]
         if device.continuous.protocol in ("", "file"):
             # local file we can memory-map
-            dat = np.load(device.continuous / "continuous.dat", mmap_mode="r")
+            dat = np.memmap(device.continuous / "continuous.dat", dtype='int16', mode='r')
         else:
             logger.warning(
                 f"Reading entirety of uncompressed OpenEphys data from {device.continuous}. If you only need part of this data, consider using `read_array_range_from_npy` with the path instead."
@@ -880,6 +881,10 @@ def overwrite_timestamps(
 
 
 if __name__ == "__main__":
+    validate_ephys(
+        r"\\allen\programs\mindscope\workgroups\dynamicrouting\ben\New folder\_temp_ (14)",
+        r"\\allen\programs\mindscope\workgroups\dynamicrouting\ben\New folder\20240417T112239.h5",
+        )
     from npc_ephys import testmod
 
     testmod()
