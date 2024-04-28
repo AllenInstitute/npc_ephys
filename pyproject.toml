@@ -11,7 +11,7 @@ dependencies = [
     "zarr>=2.16.1",
     "pandas>=2.2.0",
     "tqdm>=4.66.1",
-    "npc-lims>=0.1.134",
+    "npc-lims>=0.1.147",
     "wavpack-numcodecs>=0.1.5",
     "npc-io>=0.1.26",
 ]
