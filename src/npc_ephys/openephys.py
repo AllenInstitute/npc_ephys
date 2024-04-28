@@ -881,10 +881,6 @@ def overwrite_timestamps(
 
 
 if __name__ == "__main__":
-    validate_ephys(
-        r"\\allen\programs\mindscope\workgroups\dynamicrouting\ben\New folder\_temp_ (14)",
-        r"\\allen\programs\mindscope\workgroups\dynamicrouting\ben\New folder\20240417T112239.h5",
-        )
     from npc_ephys import testmod
 
     testmod()
