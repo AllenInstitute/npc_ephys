@@ -318,7 +318,7 @@ def get_ephys_data(
             )
         num_channels: int = device_metadata["num_channels"]
         
-        dat: npt.ArrayLike[np.int16]
+        dat: npt.NDArray[np.int16]
         if device.continuous.protocol in ("", "file"):
             # local file we can memory-map
             dat = np.memmap(device.continuous / "continuous.dat", dtype='int16', mode='r')
