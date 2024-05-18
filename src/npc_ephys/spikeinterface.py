@@ -107,7 +107,7 @@ class SpikeInterfaceKS25Data:
         """Probes available from this SpikeInterface dataset, with full set of
         data (up to metrics in "postprocessed" container)."""        
         probes = set()
-        for path in self.postprocessed.iterdir():
+        for path in self.postprocessed().iterdir():
             with contextlib.suppress(ValueError):
                 probes.add(npc_session.ProbeRecord(path.name))
         return tuple(sorted(probes))
