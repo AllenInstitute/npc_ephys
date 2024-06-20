@@ -118,7 +118,9 @@ class SpikeInterfaceKS25Data:
     @property
     def is_nextflow_pipeline(self) -> bool:
         if self.root is not None:
-            return 'N E X T F L O W' in self.output().read_text() # update to codeocean, where nextflow folder no longer part of result
+            return (
+                "N E X T F L O W" in self.output().read_text()
+            )  # update to codeocean, where nextflow folder no longer part of result
 
         return False
 
