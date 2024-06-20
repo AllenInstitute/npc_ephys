@@ -91,6 +91,9 @@ class SpikeInterfaceKS25Data:
     array([ 36,  50,  55, ...,  52, 132,  53])
     >>> len(si.original_cluster_id('probeA'))
     139
+    >>> si = SpikeInterfaceKS25Data('712815_2024-05-21_1')
+    >>> si.is_nextflow_pipeline
+    True
     """
 
     session: str | npc_session.SessionRecord | None = None
@@ -115,7 +118,7 @@ class SpikeInterfaceKS25Data:
     @property
     def is_nextflow_pipeline(self) -> bool:
         if self.root is not None:
-            return any(f.name == "nextflow" for f in self.root.iterdir())
+            return 'N E X T F L O W' in self.output().read_text() # update to codeocean, where nextflow folder no longer part of result
 
         return False
 
