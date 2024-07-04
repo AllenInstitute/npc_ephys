@@ -20,6 +20,8 @@ import numpy as np
 import numpy.typing as npt
 import packaging.version
 import pandas as pd
+import pynwb
+import hdmf_zarr
 import upath
 import zarr
 from typing_extensions import TypeAlias
@@ -391,13 +393,14 @@ class SpikeInterfaceKS25Data:
         )
 
     @property
-    def nwb(self) -> zarr.Group:
+    def nwb(self) -> pynwb.NWBFile:
         if not self.is_nextflow_pipeline:
             raise ValueError("NWB not part of output from stand alone capsule")
 
         assert self.root is not None
-
-        return zarr.open(next((self.root / "nwb").glob("*.nwb")))
+        
+        path = next((self.root / "nwb").glob("*.nwb"))
+        return hdmf_zarr.NWBZarrIO(path=path.as_posix(), mode="r").read()
 
     @functools.cache
     def default_qc(self, probe: str) -> npt.NDArray[np.floating]:
