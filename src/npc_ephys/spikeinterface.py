@@ -13,6 +13,7 @@ import json
 import logging
 from typing import Union
 
+import hdmf_zarr
 import npc_io
 import npc_lims
 import npc_session
@@ -21,7 +22,6 @@ import numpy.typing as npt
 import packaging.version
 import pandas as pd
 import pynwb
-import hdmf_zarr
 import upath
 import zarr
 from typing_extensions import TypeAlias
@@ -412,7 +412,6 @@ class SpikeInterfaceKS25Data:
     def nwb_file(self) -> pynwb.NWBFile:
         return hdmf_zarr.NWBZarrIO(path=self.nwb_path.as_posix(), mode="r").read()
 
-        
         path = next((self.root / "nwb").glob("*.nwb"))
         return hdmf_zarr.NWBZarrIO(path=path.as_posix(), mode="r").read()
 
