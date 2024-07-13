@@ -354,14 +354,14 @@ class SpikeInterfaceKS25Data:
         devices = np.array(
             [
                 npc_session.ProbeRecord(device)
-                for device in self.nwb["units/device_name"][:]
+                for device in self.nwb_zarr["units/device_name"][:]
             ]
         )
 
         return np.argwhere(devices == probe).squeeze()
 
     def get_nwb_units_device_property(self, metric: str, probe: str) -> npt.NDArray:
-        return self.nwb[f"units/{metric}"][
+        return self.nwb_zarr[f"units/{metric}"][
             self.device_indices_in_nwb_units(probe)
         ].squeeze()
 
@@ -393,11 +393,21 @@ class SpikeInterfaceKS25Data:
         )
 
     @npc_io.cached_property
-    def nwb(self) -> pynwb.NWBFile:
+    def nwb_path(self) -> upath.UPath:
         if not self.is_nextflow_pipeline:
             raise ValueError("NWB not part of output from stand alone capsule")
 
         assert self.root is not None
+        return next((self.root / "nwb").glob("*.nwb"))
+
+    @npc_io.cached_property
+    def nwb_zarr(self) -> zarr.hierarchy.Group:
+        return zarr.open(self.nwb_path, mode="r")
+
+    @npc_io.cached_property
+    def nwb_file(self) -> pynwb.NWBFile:
+        return hdmf_zarr.NWBZarrIO(path=self.nwb_path.as_posix(), mode="r").read()
+
         
         path = next((self.root / "nwb").glob("*.nwb"))
         return hdmf_zarr.NWBZarrIO(path=path.as_posix(), mode="r").read()
