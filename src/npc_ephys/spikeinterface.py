@@ -112,7 +112,11 @@ class SpikeInterfaceKS25Data:
         """Probes available from this SpikeInterface dataset, with full set of
         data (probe is present in "curated" container)."""
         probes = set()
-        for path in self.curated().iterdir():
+        try:
+            dir_path = self.get_path("sorting_precurated")
+        except FileNotFoundError:
+            dir_path = self.get_path("curated")
+        for path in dir_path.iterdir():
             with contextlib.suppress(ValueError):
                 probes.add(npc_session.ProbeRecord(path.name))
         return tuple(sorted(probes))
