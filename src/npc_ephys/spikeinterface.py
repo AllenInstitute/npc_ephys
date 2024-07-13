@@ -392,7 +392,7 @@ class SpikeInterfaceKS25Data:
             f"Unknown format of sorted output for SI {self.version=}, {self.is_nextflow_pipeline=}. As of March 2024 only handles 0.100 and lower"
         )
 
-    @property
+    @npc_io.cached_property
     def nwb(self) -> pynwb.NWBFile:
         if not self.is_nextflow_pipeline:
             raise ValueError("NWB not part of output from stand alone capsule")
