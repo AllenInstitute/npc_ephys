@@ -15,7 +15,7 @@ dependencies = [
     "wavpack-numcodecs>=0.1.5",
     "npc-io>=0.1.26",
     "pynwb>=2.8.0",
-    "hdmf-zarr==0.6.0",
+    "hdmf-zarr @ git+https://github.com/bjhardcastle/hdmf-zarr",
 ]
 version = "0.1.17"
 classifiers = [

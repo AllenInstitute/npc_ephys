@@ -5,7 +5,7 @@
 groups = ["default", "dev", "docs"]
 strategy = ["cross_platform"]
 lock_version = "4.4.1"
-content_hash = "sha256:c9881dc12bd3bc2d183534dffe44b92cc2f131d1e2ef3d70d431cc02a02efe5f"
+content_hash = "sha256:2b7bdcd1d9142b610b956663cb901102cfced59d11052752b07ae59d802b2deb"
 
 [[package]]
 name = "aind-codeocean-api"
@@ -993,20 +993,18 @@ files = [
 
 [[package]]
 name = "hdmf-zarr"
-version = "0.6.0"
+version = "0.1.dev141"
 requires_python = ">=3.8"
+git = "https://github.com/bjhardcastle/hdmf-zarr"
+revision = "4bb60c55009a78e94eef469307bf1a91d12cdc70"
 summary = "A package defining a Zarr I/O backend for HDMF"
 dependencies = [
     "hdmf>=3.9.0",
     "numcodecs>=0.9.1",
-    "numpy>=1.24",
+    "numpy<2.0,>=1.24",
     "pynwb>=2.5.0",
     "threadpoolctl>=3.1.0",
-    "zarr>=2.11.0",
-]
-files = [
-    {file = "hdmf_zarr-0.6.0-py3-none-any.whl", hash = "sha256:7bf60affefd19d64d724f2c55f12befd81fb34ad88f78421f182b5bbef9cc524"},
-    {file = "hdmf_zarr-0.6.0.tar.gz", hash = "sha256:e45db2888868a19567b8af6320df5faf5c0e3af21bcd2d3cb9919bb900a5e8c9"},
+    "zarr<3.0,>=2.11.0",
 ]
 
 [[package]]
