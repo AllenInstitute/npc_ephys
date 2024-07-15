@@ -88,14 +88,16 @@ class SpikeInterfaceKS25Data:
     >>> ''.join(si.probes)
     'ABCDEF'
     >>> si.spike_indexes('probeA')
-    array([      145,       491,       738, ..., 143124925, 143125165, 143125201])
+    array([      145,       491,       738, ..., 143124925, 143125165, 143125201], dtype=int64)
     >>> si.unit_indexes('probeA')
-    array([ 36,  50,  55, ...,  52, 132,  53])
+    array([ 36,  50,  55, ...,  52, 132,  53], dtype=int64)
     >>> len(si.original_cluster_id('probeA'))
     139
     >>> si = SpikeInterfaceKS25Data('712815_2024-05-21_1')
     >>> si.is_nextflow_pipeline
     True
+    >>> si.nwb_path.as_posix()
+    's3://codeocean-s3datasetsbucket-1u41qdg42ur9/320c7f2a-f145-4a44-8421-2b2fe1d1acbc/nwb/ecephys_712815_2024-05-21_13-01-23_experiment1_recording1.nwb'
     """
 
     session: str | npc_session.SessionRecord | None = None
