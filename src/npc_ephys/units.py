@@ -309,7 +309,7 @@ def add_electrode_annotations_to_units(
         left_on=["electrode_group_name", "peak_channel"],
         right_on=["group_name", "channel"],
     )
-    units.drop(columns=["channel"], inplace=True)
+    units.drop(columns=["group_name", "channel"], inplace=True)
     units.rename(
         columns={
             "x": "ccf_ap",
