@@ -152,7 +152,7 @@ def get_LFP_subsampled_results(
     devices_LFP_timing = tuple(
         timing
         for timing in device_timing_on_sync
-        if timing.device.name.endswith("-LFP")
+        if timing.device.name.endswith("LFP")
     )
 
     for device_timing in devices_LFP_timing:
