@@ -93,7 +93,7 @@ class SpikeInterfaceKS25Data:
     array([ 36,  50,  55, ...,  52, 132,  53])
     >>> len(si.original_cluster_id('probeA'))
     139
-    >>> si = SpikeInterfaceKS25Data('712815_2024-05-21_1')
+    >>> si = SpikeInterfaceKS25Data('712815_2024-05-21')
     >>> si.is_nextflow_pipeline
     True
     """
