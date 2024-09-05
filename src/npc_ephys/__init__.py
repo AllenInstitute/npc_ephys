@@ -13,6 +13,7 @@ from npc_ephys.openephys import *
 from npc_ephys.settings_xml import *
 from npc_ephys.spikeinterface import *
 from npc_ephys.units import *
+from npc_ephys.LFP import *
 
 logger = logging.getLogger(__name__)
 
