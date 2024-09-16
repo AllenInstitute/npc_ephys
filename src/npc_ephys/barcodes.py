@@ -59,17 +59,17 @@ def extract_barcodes_from_times(
     start_indices = np.where(np.diff(on_times) > inter_barcode_interval)[0] + 1
     if on_times[0] > barcode_duration_ceiling:
         # keep first barcode as it occurred sufficiently far from start of recording
-        start_indices = np.insert(start_indices, 0, 0)  
+        start_indices = np.insert(start_indices, 0, 0)
     # remove times close to end of recording to avoid using truncated barcode
-    if (
-        total_time_on_line is not None
-    ):
-        off_times = off_times[off_times <= (total_time_on_line - barcode_duration_ceiling)]
+    if total_time_on_line is not None:
+        off_times = off_times[
+            off_times <= (total_time_on_line - barcode_duration_ceiling)
+        ]
         on_times = on_times[on_times < off_times[-1]]
         start_indices = start_indices[start_indices < len(on_times)]
         assert len(on_times) == len(off_times), "on and off times must be same length"
         assert max(start_indices) < len(on_times), "start indices out of bounds"
-    
+
     barcode_start_times = on_times[start_indices]
     barcodes = []
     for _i, t in enumerate(barcode_start_times):
