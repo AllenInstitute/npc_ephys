@@ -402,7 +402,7 @@ def get_ephys_timing_on_sync(
     >>> sync = upath.UPath('s3://aind-ephys-data/ecephys_670248_2023-08-03_12-04-15/behavior/20230803T120415.h5')
     >>> timing_info = next(get_ephys_timing_on_sync(sync, path))
     >>> timing_info.device.name, timing_info.sampling_rate, timing_info.start_time
-    ('Neuropix-PXI-100.ProbeA-AP', 30000.070518634246, 20.080209634424037)
+    ('Neuropix-PXI-100.ProbeA-AP', 30000.070472670912, 20.080209602072898)
     """
     if not (recording_dirs or devices):
         raise ValueError("Must specify recording_dir or devices")
@@ -827,11 +827,11 @@ def get_adjusted_timestamps(
     >>> ephys_timing = next(get_ephys_timing_on_sync(sync, path))
     >>> t = get_adjusted_timestamps(ephys_timing)
     >>> t.continuous
-    array([  20.08020963,   20.08024297,   20.0802763 , ..., 4776.21732976,
-           4776.21736309, 4776.21739642])
+    array([  20.0802096 ,   20.08024294,   20.08027627, ..., 4776.21733701,
+           4776.21737035, 4776.21740368])
     >>> t.events
-    array([  41.19566   ,   41.21569329,   41.26469317, ..., 4779.77398806,
-           4779.83198793, 4779.86105453])
+    array([  41.19566   ,   41.21569329,   41.26469317, ..., 4779.77399532,
+           4779.83199519, 4779.86106179])
     """
     default_continuous = np.arange(
         start=0,
