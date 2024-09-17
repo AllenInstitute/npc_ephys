@@ -17,6 +17,7 @@ dependencies = [
     "pynwb>=2.8.0",
     "hdmf_zarr_bjh==0.8.1",
     "polars>=0.20.26",
+    "pyarrow>=14.0",
 ]
 version = "0.1.22"
 classifiers = [
