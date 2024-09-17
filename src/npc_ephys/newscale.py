@@ -129,9 +129,10 @@ def get_newscale_coordinates(
 
     df = (
         df.filter(movement < start.dt)
+        .select(NEWSCALE_LOG_COLUMNS[:-3])
         .group_by(serial_number)
         .agg(
-            pl.col(NEWSCALE_LOG_COLUMNS[:-3]).sort_by(movement).last()
+            pl.all().sort_by(movement).last()
         )  # get last-moved for each manipulator
         .top_k(6, by=movement)
     )
