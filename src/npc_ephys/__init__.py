@@ -8,12 +8,12 @@ import logging
 
 from npc_ephys.barcodes import *
 from npc_ephys.LFP import *
+from npc_ephys.newscale import *
 
 # import functions from submodules here:
 from npc_ephys.openephys import *
 from npc_ephys.settings_xml import *
 from npc_ephys.spikeinterface import *
-from npc_ephys.newscale import *
 from npc_ephys.units import *
 
 logger = logging.getLogger(__name__)
