@@ -5,7 +5,7 @@
 groups = ["default", "dev", "docs"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:7a690af52dcc8a71c54f7fa8a42b048b815a6f10143e0c9dd036dc6090e243a6"
+content_hash = "sha256:4163eaf3860054436375066741e34cd6cb8a5e277e5435e88d1f564bd470427f"
 
 [[metadata.targets]]
 requires_python = ">=3.9"
@@ -3294,7 +3294,7 @@ files = [
 
 [[package]]
 name = "wavpack-numcodecs"
-version = "0.2.0"
+version = "0.1.5"
 summary = "Numcodecs implementation of WavPack audio codec."
 groups = ["default"]
 dependencies = [
@@ -3303,7 +3303,7 @@ dependencies = [
     "packaging",
 ]
 files = [
-    {file = "wavpack-numcodecs-0.2.0.tar.gz", hash = "sha256:57eeefc0fedb253e4ceb1d6eeec8690b15e8bc10e88ebb66c7006db6ae609b88"},
+    {file = "wavpack_numcodecs-0.1.5.tar.gz", hash = "sha256:1c9512b3b2a3f628d7a13691e2812eba9c182238ae90ab9cc66932cdd4d6842b"},
 ]
 
 [[package]]
