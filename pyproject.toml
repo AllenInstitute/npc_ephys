@@ -16,6 +16,7 @@ dependencies = [
     "npc-io>=0.1.26",
     "pynwb>=2.8.0",
     "hdmf_zarr_bjh==0.8.1",
+    "polars>=0.20.26",
 ]
 version = "0.1.22"
 classifiers = [
