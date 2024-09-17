@@ -53,9 +53,11 @@ def extract_barcodes_from_times(
     barcodes : list of int
         For each detected barcode, the value of that barcode as an integer.
     """
-    if len(on_times) > len(off_times):
+    if off_times[0] < on_times[0]:
+        off_times = off_times[1:]
+    if on_times[-1] > off_times[-1]:
         on_times = on_times[:-1]
-
+    assert len(on_times) == len(off_times), f"on and off times should be same length ({len(on_times)} != {len(off_times)})"
     start_indices = np.where(np.diff(on_times) > inter_barcode_interval)[0] + 1
     if on_times[0] > barcode_duration_ceiling:
         # keep first barcode as it occurred sufficiently far from start of recording
@@ -67,8 +69,8 @@ def extract_barcodes_from_times(
         ]
         on_times = on_times[on_times < off_times[-1]]
         start_indices = start_indices[start_indices < len(on_times)]
-        assert len(on_times) == len(off_times), "on and off times must be same length"
-        assert max(start_indices) < len(on_times), "start indices out of bounds"
+    assert len(on_times) == len(off_times), f"on and off times should be same length ({len(on_times)} != {len(off_times)})"
+    assert max(start_indices) < len(on_times), f"start indices out of bounds ({max(start_indices)} >= {len(on_times)})"
 
     barcode_start_times = on_times[start_indices]
     barcodes = []
