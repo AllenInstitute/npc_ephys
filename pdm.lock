@@ -5,7 +5,7 @@
 groups = ["default", "dev", "docs"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:4163eaf3860054436375066741e34cd6cb8a5e277e5435e88d1f564bd470427f"
+content_hash = "sha256:1d83075637be022dfa89537fb3ec25c989e1ecc39ae75282a32e9c4f8dfcfecc"
 
 [[metadata.targets]]
 requires_python = ">=3.9"
@@ -1191,7 +1191,7 @@ files = [
 
 [[package]]
 name = "hdmf-zarr-bjh"
-version = "0.8.1"
+version = "0.8.1.post1"
 requires_python = ">=3.8"
 summary = "A package defining a Zarr I/O backend for HDMF - forked to fix a bug"
 groups = ["default"]
@@ -1201,11 +1201,11 @@ dependencies = [
     "numpy<2.0,>=1.24",
     "pynwb>=2.5.0",
     "threadpoolctl>=3.1.0",
-    "zarr<3.0,>=2.11.0",
+    "zarr==2.17.2",
 ]
 files = [
-    {file = "hdmf_zarr_bjh-0.8.1-py3-none-any.whl", hash = "sha256:68ea3062c20ab80fc9786235866bf517f27d86fdabdcdccd5671dfe8e66cb780"},
-    {file = "hdmf_zarr_bjh-0.8.1.tar.gz", hash = "sha256:9e381014f8d93308381d6c523ced279308c463034f130d1a935613e08d89199c"},
+    {file = "hdmf_zarr_bjh-0.8.1.post1-py3-none-any.whl", hash = "sha256:c5eb74982c2fe322a33ad256a5921df9e598c7866dafc5128afbefc5ad0731ec"},
+    {file = "hdmf_zarr_bjh-0.8.1.post1.tar.gz", hash = "sha256:02c6e060a0eb69d6e50e3d26435938d2fd5ee0bbf28de1ab31de5c3b471c89a8"},
 ]
 
 [[package]]
@@ -3449,7 +3449,7 @@ files = [
 
 [[package]]
 name = "zarr"
-version = "2.18.0"
+version = "2.17.2"
 requires_python = ">=3.9"
 summary = "An implementation of chunked, compressed, N-dimensional arrays for Python"
 groups = ["default"]
@@ -3460,8 +3460,8 @@ dependencies = [
     "numpy>=1.23",
 ]
 files = [
-    {file = "zarr-2.18.0-py3-none-any.whl", hash = "sha256:7f8532b6a3f50f22e809e130e09353637ec8b5bb5e95a5a0bfaae91f63978b5d"},
-    {file = "zarr-2.18.0.tar.gz", hash = "sha256:c3b7d2c85b8a42b0ad0ad268a36fb6886ca852098358c125c6b126a417e0a598"},
+    {file = "zarr-2.17.2-py3-none-any.whl", hash = "sha256:70d7cc07c24280c380ef80644151d136b7503b0d83c9f214e8000ddc0f57f69b"},
+    {file = "zarr-2.17.2.tar.gz", hash = "sha256:2cbaa6cb4e342d45152d4a7a4b2013c337fcd3a8e7bc98253560180de60552ce"},
 ]
 
 [[package]]
