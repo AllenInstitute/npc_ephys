@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 from collections.abc import Iterable
 
 import npc_lims
@@ -12,7 +13,6 @@ import zarr
 import zarr.core
 
 import npc_ephys.openephys
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +41,7 @@ class LFP:
             raise ValueError(
                 "Mismatch in channel dimension between traces and selected channels"
             )
+
 
 def _get_LFP_channel_ids(LFP_channels: zarr.core.Array | list[str]) -> tuple[int, ...]:
     """
@@ -71,9 +72,7 @@ def _get_LFP_probe_result(
     temporal_factor: int = 2,
 ) -> LFP | None:
     probe_LFP_subsampled_file = tuple(
-        file
-        for file in LFP_subsampled_files
-        if probe in str(file)
+        file for file in LFP_subsampled_files if probe in str(file)
     )
     if not probe_LFP_subsampled_file:
         logger.warning(
@@ -83,11 +82,15 @@ def _get_LFP_probe_result(
         return None
 
     probe_LFP_zarr_file = probe_LFP_subsampled_file[0]
-    probe_LFP_zarr = zarr.open(probe_LFP_zarr_file, mode='r')
-    probe_LFP_traces, probe_LFP_channels = probe_LFP_zarr['traces_seg0'], probe_LFP_zarr['channel_ids']
- 
+    probe_LFP_zarr = zarr.open(probe_LFP_zarr_file, mode="r")
+    probe_LFP_traces, probe_LFP_channels = (
+        probe_LFP_zarr["traces_seg0"],
+        probe_LFP_zarr["channel_ids"],
+    )
+
     probe_LFP_aligned_timestamps = (
-        np.arange(probe_LFP_traces.shape[0]) / (device_timing.sampling_rate / temporal_factor)
+        np.arange(probe_LFP_traces.shape[0])
+        / (device_timing.sampling_rate / temporal_factor)
     ) + device_timing.start_time
 
     probe_LFP_channel_ids = _get_LFP_channel_ids(probe_LFP_channels)
@@ -123,9 +126,7 @@ def get_LFP_subsampled_results(
     """
     LFP_subsampled_results = []
     session = npc_session.SessionRecord(session)
-    session_LFP_subsampled_files = npc_lims.get_LFP_subsampling_paths_from_s3(
-        session
-    )
+    session_LFP_subsampled_files = npc_lims.get_LFP_subsampling_paths_from_s3(session)
 
     devices_LFP_timing = tuple(
         timing for timing in device_timing_on_sync if timing.device.name.endswith("LFP")
