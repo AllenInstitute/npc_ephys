@@ -12,6 +12,9 @@ import zarr
 import zarr.core
 
 import npc_ephys.openephys
+import logging
+
+logger = logging.getLogger(__name__)
 
 LFP_SUBSAMPLED_SAMPLING_RATE = 1250
 
@@ -39,29 +42,6 @@ class LFP:
                 "Mismatch in channel dimension between traces and selected channels"
             )
 
-
-def _get_LFP_subsampled_output(
-    LFP_subsampled_files: upath.UPath,
-) -> tuple[zarr.core.Array, ...]:
-    LFP_time_samples_path = tuple(LFP_subsampled_files.glob("*_samples.zarr"))
-    if not LFP_time_samples_path:
-        raise FileNotFoundError("No LFP time samples found. Check codeocean")
-
-    LFP_traces_path = tuple(LFP_subsampled_files.glob("*_subsampled.zarr"))
-    if not LFP_traces_path:
-        raise FileNotFoundError("No LFP traces found. Check codeocean")
-
-    LFP_channels_path = tuple(LFP_subsampled_files.glob("*_channels.zarr"))
-    if not LFP_channels_path:
-        raise FileNotFoundError("No LFP channels found. Check codeocean")
-
-    LFP_traces = zarr.open(LFP_traces_path[0], mode="r")["traces_seg0"]
-    LFP_time_samples = zarr.open(LFP_time_samples_path[0], mode="r")
-    LFP_channels = zarr.open(LFP_channels_path[0], mode="r")
-
-    return LFP_traces, LFP_time_samples, LFP_channels
-
-
 def _get_LFP_channel_ids(LFP_channels: zarr.core.Array | list[str]) -> tuple[int, ...]:
     """
     >>> ids = ['LFP1', 'LFP4', 'LFP380']
@@ -87,31 +67,29 @@ def _get_LFP_channel_ids(LFP_channels: zarr.core.Array | list[str]) -> tuple[int
 def _get_LFP_probe_result(
     probe: str,
     device_timing: npc_ephys.openephys.EphysTimingInfo,
-    LFP_subsampled_directories: tuple[upath.UPath, ...],
+    LFP_subsampled_files: tuple[upath.UPath, ...],
     temporal_factor: int = 2,
-) -> LFP:
-    probe_LFP_subsampled_directory = tuple(
-        directory
-        for directory in LFP_subsampled_directories
-        if directory.is_dir() and probe in str(directory)
+) -> LFP | None:
+    probe_LFP_subsampled_file = tuple(
+        file
+        for file in LFP_subsampled_files
+        if probe in str(file)
     )
-    if not probe_LFP_subsampled_directory:
-        raise FileNotFoundError(
-            f"No LFP subsampled results for probe {probe}. Check codeocean"
+    if not probe_LFP_subsampled_file:
+        logger.warning(
+            f"No LFP subsampled results for probe {probe}. Potentially skipped due to no surface channel index. Check codeocean"
         )
 
-    probe_LFP_directory = probe_LFP_subsampled_directory[0]
-    probe_LFP_traces, probe_LFP_samples, probe_LFP_channels = (
-        _get_LFP_subsampled_output(probe_LFP_directory)
-    )
-    # time samples from output are evenly spaced at 1/1250, apply scale: (actual sampling rate / temporal factor) / 1250
+        return None
+
+    probe_LFP_zarr_file = probe_LFP_subsampled_file[0]
+    probe_LFP_zarr = zarr.open(probe_LFP_zarr_file, mode='r')
+    probe_LFP_traces, probe_LFP_channels = probe_LFP_zarr['traces_seg0'], probe_LFP_zarr['channel_ids']
+ 
     probe_LFP_aligned_timestamps = (
-        probe_LFP_samples[:]
-        / (
-            (device_timing.sampling_rate / temporal_factor)
-            / LFP_SUBSAMPLED_SAMPLING_RATE
-        )
+        np.arange(probe_LFP_traces.shape[0]) / (device_timing.sampling_rate / temporal_factor)
     ) + device_timing.start_time
+
     probe_LFP_channel_ids = _get_LFP_channel_ids(probe_LFP_channels)
 
     return LFP(
@@ -130,22 +108,22 @@ def get_LFP_subsampled_results(
     """
     Gets the LFP subsampled output for the session. Returns an object for each probe with subsampled traces, aligned timestamps, channel ids,
     probe name, and sampling rate
-    >>> device_timing_on_sync = npc_ephys.openephys.get_ephys_timing_on_sync(npc_lims.get_h5_sync_from_s3('674562_2023-10-05'), npc_lims.get_recording_dirs_experiment_path_from_s3('674562_2023-10-05'), only_devices_including='ProbeA')
-    >>> LFP_probeA = get_LFP_subsampled_results('674562_2023-10-05', device_timing_on_sync)
+    >>> device_timing_on_sync = npc_ephys.openephys.get_ephys_timing_on_sync(npc_lims.get_h5_sync_from_s3('674562_2023-10-03'), npc_lims.get_recording_dirs_experiment_path_from_s3('674562_2023-10-03'), only_devices_including='ProbeA')
+    >>> LFP_probeA = get_LFP_subsampled_results('674562_2023-10-03', device_timing_on_sync)
     >>> LFP_probeA[0].traces.shape
-    (8813052, 96)
+    (8923628, 96)
     >>> LFP_probeA[0].timestamps.shape
-    (8813052,)
+    (8923628,)
     >>> len(LFP_probeA[0].channel_ids)
     96
     >>> LFP_probeA[0].probe
     'ProbeA'
     >>> LFP_probeA[0].sampling_rate
-    1250.0025845802068
+    1250.0031940878919
     """
     LFP_subsampled_results = []
     session = npc_session.SessionRecord(session)
-    session_LFP_subsampled_directories = npc_lims.get_LFP_subsampling_paths_from_s3(
+    session_LFP_subsampled_files = npc_lims.get_LFP_subsampling_paths_from_s3(
         session
     )
 
@@ -155,9 +133,14 @@ def get_LFP_subsampled_results(
 
     for device_timing in devices_LFP_timing:
         probe = f"Probe{npc_session.ProbeRecord(device_timing.device.name)}"
+
         probe_LFP_subsampled_result = _get_LFP_probe_result(
-            probe, device_timing, session_LFP_subsampled_directories
+            probe, device_timing, session_LFP_subsampled_files
         )
+
+        if probe_LFP_subsampled_result is None:
+            continue
+
         LFP_subsampled_results.append(probe_LFP_subsampled_result)
 
     return tuple(LFP_subsampled_results)
