@@ -870,7 +870,7 @@ def overwrite_timestamps(
                 f"{flag} exists: timestamps have already been adjusted"
             )
         logger.debug(f"Overwriting {path}")
-        np.save(path, data)
+        np.save(path.absolute(), data) # don't follow symlinks: overwrite the symlink itself
         logger.debug("Creating flag file")
         flag.write_text(
             "Original timestamps.npy file has been overwritten with sync-adjusted timestamps"
