@@ -92,7 +92,7 @@ class EphysDeviceInfo:
         clock. If one has been adjusted and the other hasn't, raise an AssertionError.
         """
         continuous = (self.continuous / TIMESTAMPS_ADJUSTED_FLAG_FILENAME).exists()
-        events = (self.events / TIMESTAMPS_ADJUSTED_FLAG_FILENAME).exists()
+        events = (self.events / "TTL" / TIMESTAMPS_ADJUSTED_FLAG_FILENAME).exists()
         if continuous != events:
             not_adjusted = "continuous" if not continuous else "events"
             raise AssertionError(
@@ -879,7 +879,7 @@ def overwrite_timestamps(
     for info in ephys_timing:
         adjusted = get_adjusted_timestamps(info)
         overwrite(info.device.continuous / "timestamps.npy", adjusted.continuous)
-        overwrite(info.device.events / "timestamps.npy", adjusted.events)
+        overwrite(info.device.events / "TTL" / "timestamps.npy", adjusted.events)
 
 
 if __name__ == "__main__":
