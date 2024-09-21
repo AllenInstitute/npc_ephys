@@ -871,10 +871,8 @@ def overwrite_timestamps(
             )
         logger.debug(f"Overwriting {path.as_posix()}")
         if path.is_symlink():
-            path.unlink() # otherwise the symlink target will be overwritten
-        np.save(
-            path.as_posix(), data
-        )
+            path.unlink()  # otherwise the symlink target will be overwritten
+        np.save(path.as_posix(), data)
         logger.debug(f"Creating flag file {flag.as_posix()}")
         flag.write_text(
             "Original timestamps.npy file has been overwritten with sync-adjusted timestamps"
