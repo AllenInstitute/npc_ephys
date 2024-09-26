@@ -362,7 +362,12 @@ def get_pxi_nidaq_data(
 def get_pxi_nidaq_info(
     recording_dir: Iterable[npc_io.PathLike],
 ) -> EphysTimingInfoOnPXI:
-    """NI-DAQmx device info
+    """Convenience method to get timing info for one NI-DAQmx device.
+    
+    - if more than one device is found:
+      - if the device names match, they're assumed to be duplicate recordings
+      across record nodes and the first is returned (with a warning logged)
+      - if the device names differ, a ValueError is raised
 
     >>> path = upath.UPath('s3://aind-ephys-data/ecephys_670248_2023-08-03_12-04-15/ecephys_clipped/Record Node 102/experiment1/recording1')
     >>> get_pxi_nidaq_info(path).device.ttl.parent.name
@@ -379,9 +384,14 @@ def get_pxi_nidaq_info(
             f"No */continuous/NI-DAQmx-*/ dir found in {recording_dir = }"
         )
     if info and len(info) != 1:
-        raise FileNotFoundError(
-            f"Expected a single NI-DAQmx folder to exist, but found: {[d.device.continuous for d in info]}"
-        )
+        warning_msg = f"Expected a single NI-DAQmx folder to exist, but found: {[d.device.continuous for d in info]}."
+        advice_msg = "Supply a specific `recording_dir` to narrow down the search."
+        if len(set(i.device.name for i in info)) == 1:
+            logger.warning(
+                f"{warning_msg} Names are the same, so we'll assume they're duplicates and return the first one found. {advice_msg}"
+            )
+        else:
+            raise ValueError(f"{warning_msg} Names differ, so we don't know which to use. {advice_msg}")
     return info[0]
 
 
