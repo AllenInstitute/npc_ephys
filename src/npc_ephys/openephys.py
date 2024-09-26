@@ -363,7 +363,7 @@ def get_pxi_nidaq_info(
     recording_dir: Iterable[npc_io.PathLike],
 ) -> EphysTimingInfoOnPXI:
     """Convenience method to get timing info for one NI-DAQmx device.
-    
+
     - if more than one device is found:
       - if the device names match, they're assumed to be duplicate recordings
       across record nodes and the first is returned (with a warning logged)
@@ -391,7 +391,9 @@ def get_pxi_nidaq_info(
                 f"{warning_msg} Names are the same, so we'll assume they're duplicates and return the first one found. {advice_msg}"
             )
         else:
-            raise ValueError(f"{warning_msg} Names differ, so we don't know which to use. {advice_msg}")
+            raise ValueError(
+                f"{warning_msg} Names differ, so we don't know which to use. {advice_msg}"
+            )
     return info[0]
 
 
