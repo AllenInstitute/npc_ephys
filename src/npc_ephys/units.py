@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 def bin_spike_times(
     spike_times: npt.NDArray[np.float64], bin_interval: int
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+    if not spike_times.any():
+        raise ValueError("spike_times provided is empty")
     spike_times = np.concatenate(spike_times, axis=0)  # flatten array
     return np.histogram(
         spike_times,
