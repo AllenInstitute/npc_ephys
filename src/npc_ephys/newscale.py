@@ -19,6 +19,7 @@ SERIAL_NUM_TO_PROBE_LETTER = (
         "SN32142": "B",
         "SN32144": "C",
         "SN32149": "D",
+        "SN24272": "D",
         "SN32135": "E",
         "SN24273": "F",
     }  # NP.0
