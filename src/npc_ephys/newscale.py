@@ -72,7 +72,7 @@ NEWSCALE_LOG_COLUMNS = (
 
 def get_newscale_data(path: npc_io.PathLike) -> pl.DataFrame:
     """May be empty if log.csv is empty.
-    
+
     >>> df = get_newscale_data('s3://aind-ephys-data/ecephys_686740_2023-10-23_14-11-05/behavior/log.csv')
     """
     try:
@@ -89,6 +89,7 @@ def get_newscale_data(path: npc_io.PathLike) -> pl.DataFrame:
         )
     except pl.exceptions.NoDataError:
         return pl.DataFrame()
+
 
 def get_newscale_coordinates(
     newscale_log_path: npc_io.PathLike,
