@@ -71,21 +71,24 @@ NEWSCALE_LOG_COLUMNS = (
 
 
 def get_newscale_data(path: npc_io.PathLike) -> pl.DataFrame:
-    """
+    """May be empty if log.csv is empty.
+    
     >>> df = get_newscale_data('s3://aind-ephys-data/ecephys_686740_2023-10-23_14-11-05/behavior/log.csv')
     """
-    return pl.read_csv(
-        source=npc_io.from_pathlike(path).as_posix(),
-        new_columns=NEWSCALE_LOG_COLUMNS,
-        try_parse_dates=True,
-        ignore_errors=True,
-        # some log files have leading null values on first row, which cause date-parsing errors:
-        # alternative is to use `infer_schema_length=int(1e9)` to read more rows,
-        # but it's slower than `ignore_errors` and sometimes still doesn't parse
-        # dates correctly.
-        # since we only have one column that needs parsing, this seems safe to use
-    )
-
+    try:
+        return pl.read_csv(
+            source=npc_io.from_pathlike(path).as_posix(),
+            new_columns=NEWSCALE_LOG_COLUMNS,
+            try_parse_dates=True,
+            ignore_errors=True,
+            # some log files have leading null values on first row, which cause date-parsing errors:
+            # alternative is to use `infer_schema_length=int(1e9)` to read more rows,
+            # but it's slower than `ignore_errors` and sometimes still doesn't parse
+            # dates correctly.
+            # since we only have one column that needs parsing, this seems safe to use
+        )
+    except pl.exceptions.NoDataError:
+        return pl.DataFrame()
 
 def get_newscale_coordinates(
     newscale_log_path: npc_io.PathLike,
@@ -122,7 +125,7 @@ def get_newscale_coordinates(
 
     # if experiment date isn't in df, the log file didn't cover this experiment -
     # we can't continue
-    if start.dt.date() not in df["last_movement_dt"].dt.date():
+    if df.is_empty() or start.dt.date() not in df["last_movement_dt"].dt.date():
         raise IndexError(
             f"no movement data found for experiment date {start.dt.date()} in {newscale_log_path.as_posix()}"
         )
