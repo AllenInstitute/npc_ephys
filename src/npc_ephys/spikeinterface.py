@@ -424,7 +424,7 @@ class SpikeInterfaceKS25Data:
                 ).read_bytes()
             )
         )
-        
+
     @functools.cache
     def decoder_probability(self, probe: str) -> npt.NDArray[np.floating]:
         return np.load(
@@ -434,7 +434,7 @@ class SpikeInterfaceKS25Data:
                 ).read_bytes()
             )
         )
-        
+
     @functools.cache
     def decoder_label(self, probe: str) -> npt.NDArray[np.str_]:
         return np.load(
@@ -451,11 +451,13 @@ class SpikeInterfaceKS25Data:
         return np.load(
             io.BytesIO(
                 self.get_correct_path(
-                    self.postprocessed(probe), "spike_amplitudes", "amplitude_segment_0.npy"
+                    self.postprocessed(probe),
+                    "spike_amplitudes",
+                    "amplitude_segment_0.npy",
                 ).read_bytes()
             )
         )
-        
+
     @functools.cache
     def unit_locations(self, probe: str) -> npt.NDArray[np.floating]:
         return np.load(
