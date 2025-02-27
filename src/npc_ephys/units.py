@@ -190,6 +190,12 @@ def _device_helper(
     df_device_metrics["default_qc"] = spike_interface_data.default_qc(
         electrode_group_name
     )
+    df_device_metrics["decoder_label"] = spike_interface_data.decoder_label(
+        electrode_group_name
+    )
+    df_device_metrics["decoder_probability"] = spike_interface_data.decoder_probability(
+        electrode_group_name
+    )
     df_device_metrics["amplitude"] = awc.amplitudes
     if include_waveform_arrays:
         df_device_metrics["waveform_mean"] = awc.templates_mean
