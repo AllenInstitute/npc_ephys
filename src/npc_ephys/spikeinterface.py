@@ -436,7 +436,7 @@ class SpikeInterfaceKS25Data:
         )
         
     @functools.cache
-    def decoder_label(self, probe: str) -> npt.NDArray[str]:
+    def decoder_label(self, probe: str) -> npt.NDArray[np.str_]:
         return np.load(
             io.BytesIO(
                 self.get_correct_path(
@@ -446,6 +446,16 @@ class SpikeInterfaceKS25Data:
             allow_pickle=True,
         )
 
+    @functools.cache
+    def spike_amplitudes(self, probe: str) -> npt.NDArray[np.floating]:
+        return np.load(
+            io.BytesIO(
+                self.get_correct_path(
+                    self.postprocessed(probe), "spike_amplitudes", "amplitude_segment_0.npy"
+                ).read_bytes()
+            )
+        )
+        
     @functools.cache
     def unit_locations(self, probe: str) -> npt.NDArray[np.floating]:
         return np.load(
