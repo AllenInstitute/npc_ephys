@@ -167,7 +167,7 @@ class SpikeInterfaceKS25Data:
         assert self.root is not None
         return self.read_json(self.get_correct_path(self.root, filename))
 
-    def get_path(self, dirname: str, probe: str | None = None) -> upath.UPath:
+    def get_path(self, dirname: str, probe: str | None = None, extra_name_component: str | None = None) -> upath.UPath:
         """Return a path to a single dir or file: either `self.root/dirname` or, if `probe` is specified,
         the probe-specific sub-path within `self.root/dirname`."""
         assert self.root is not None
@@ -182,9 +182,10 @@ class SpikeInterfaceKS25Data:
             path = next(
                 (
                     path
-                    for path in self.get_correct_path(self.root, dirname).iterdir()
+                    for path in sorted(self.get_correct_path(self.root, dirname).iterdir())
                     if npc_session.ProbeRecord(probe)
                     == npc_session.ProbeRecord(path.as_posix())
+                    and (extra_name_component is None or extra_name_component in path.name)
                 ),
                 None,
             )
@@ -206,8 +207,8 @@ class SpikeInterfaceKS25Data:
     # dirs
     drift_maps = functools.partialmethod(get_path, "drift_maps")
     output = functools.partialmethod(get_path, "output")
-    postprocessed = functools.partialmethod(get_path, "postprocessed")
-    spikesorted = functools.partialmethod(get_path, "spikesorted")
+    postprocessed = functools.partialmethod(get_path, "postprocessed", "experiment")
+    spikesorted = functools.partialmethod(get_path, "spikesorted", "experiment")
 
     @functools.cache
     def curated(self, probe: str) -> upath.UPath:
