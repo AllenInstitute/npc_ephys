@@ -226,21 +226,21 @@ class SpikeInterfaceKS25Data:
     def quality_metrics_dict(self, probe: str) -> dict:
         return self.read_json(
             self.get_correct_path(
-                self.postprocessed(probe), "quality_metrics", "params.json"
+                self.postprocessed(probe=probe), "quality_metrics", "params.json"
             )
         )
 
     @functools.cache
     def postprocessed_params_dict(self, probe: str) -> dict:
         return self.read_json(
-            self.get_correct_path(self.postprocessed(probe), "params.json")
+            self.get_correct_path(self.postprocessed(probe=probe), "params.json")
         )
 
     @functools.cache
     def quality_metrics_df(self, probe: str) -> pd.DataFrame:
         return self.read_csv(
             self.get_correct_path(
-                self.postprocessed(probe), "quality_metrics", "metrics.csv"
+                self.postprocessed(probe=probe), "quality_metrics", "metrics.csv"
             )
         )
 
@@ -248,7 +248,7 @@ class SpikeInterfaceKS25Data:
     def template_metrics_dict(self, probe: str) -> dict:
         return self.read_json(
             self.get_correct_path(
-                self.postprocessed(probe), "template_metrics", "params.json"
+                self.postprocessed(probe=probe), "template_metrics", "params.json"
             )
         )
 
@@ -256,7 +256,7 @@ class SpikeInterfaceKS25Data:
     def template_metrics_df(self, probe: str) -> pd.DataFrame:
         return self.read_csv(
             self.get_correct_path(
-                self.postprocessed(probe), "template_metrics", "metrics.csv"
+                self.postprocessed(probe=probe), "template_metrics", "metrics.csv"
             )
         )
 
@@ -265,7 +265,7 @@ class SpikeInterfaceKS25Data:
         return np.load(
             io.BytesIO(
                 self.get_correct_path(
-                    self.postprocessed(probe), "templates_average.npy"
+                    self.postprocessed(probe=probe), "templates_average.npy"
                 ).read_bytes()
             )
         )
@@ -275,7 +275,7 @@ class SpikeInterfaceKS25Data:
         return np.load(
             io.BytesIO(
                 self.get_correct_path(
-                    self.postprocessed(probe), "templates_std.npy"
+                    self.postprocessed(probe=probe), "templates_std.npy"
                 ).read_bytes()
             )
         )
@@ -302,7 +302,7 @@ class SpikeInterfaceKS25Data:
     @functools.cache
     def sparsity(self, probe: str) -> dict:
         return self.read_json(
-            self.get_correct_path(self.postprocessed(probe), "sparsity.json")
+            self.get_correct_path(self.postprocessed(probe=probe), "sparsity.json")
         )
 
     @functools.cache
@@ -453,7 +453,7 @@ class SpikeInterfaceKS25Data:
         spike_amplitudes = np.load(
             io.BytesIO(
                 self.get_correct_path(
-                    self.postprocessed(probe),
+                    self.postprocessed(probe=probe),
                     "spike_amplitudes",
                     "amplitude_segment_0.npy",
                 ).read_bytes()
@@ -470,7 +470,7 @@ class SpikeInterfaceKS25Data:
         return np.load(
             io.BytesIO(
                 self.get_correct_path(
-                    self.postprocessed(probe), "unit_locations", "unit_locations.npy"
+                    self.postprocessed(probe=probe), "unit_locations", "unit_locations.npy"
                 ).read_bytes()
             )
         )
@@ -478,14 +478,14 @@ class SpikeInterfaceKS25Data:
     @functools.cache
     def sorting_json(self, probe: str) -> dict:
         return self.read_json(
-            self.get_correct_path(self.postprocessed(probe), "sorting.json")
+            self.get_correct_path(self.postprocessed(probe=probe), "sorting.json")
         )
 
     @functools.cache
     def recording_attributes_json(self, probe: str) -> dict:
         return self.read_json(
             self.get_correct_path(
-                self.postprocessed(probe), "recording_info", "recording_attributes.json"
+                self.postprocessed(probe=probe), "recording_info", "recording_attributes.json"
             )
         )
 
