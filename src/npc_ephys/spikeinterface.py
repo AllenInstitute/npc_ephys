@@ -462,7 +462,7 @@ class SpikeInterfaceKS25Data:
         spike_amplitudes_by_unit: list[npt.NDArray[np.floating]] = []
         for index in sorted(np.unique(unit_indexes)):
             spike_amplitudes_by_unit.append(
-                spike_amplitudes[np.where(unit_indexes == index)[0]]
+                spike_amplitudes[unit_indexes == index]
             )
         return tuple(spike_amplitudes_by_unit)
     
