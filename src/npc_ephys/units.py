@@ -224,8 +224,13 @@ def _device_helper(
         [len(unit) for unit in units_x_spike_times],
     ), "Mismatch between rows in spike_times and metrics.csv"
     df_device_metrics["spike_times"] = units_x_spike_times
-    df_device_metrics["spike_amplitudes"] = spike_interface_data.spike_amplitudes(electrode_group_name)
-    assert all(len(df_device_metrics["spike_amplitudes"].iloc[i]) == len(spike_times) for i, spike_times in enumerate(units_x_spike_times)), "Mismatch between spike_times and spike_amplitudes"
+    df_device_metrics["spike_amplitudes"] = spike_interface_data.spike_amplitudes(
+        electrode_group_name
+    )
+    assert all(
+        len(df_device_metrics["spike_amplitudes"].iloc[i]) == len(spike_times)
+        for i, spike_times in enumerate(units_x_spike_times)
+    ), "Mismatch between spike_times and spike_amplitudes"
 
     return df_device_metrics
 

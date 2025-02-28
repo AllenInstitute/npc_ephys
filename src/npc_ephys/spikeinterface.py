@@ -461,11 +461,9 @@ class SpikeInterfaceKS25Data:
         unit_indexes = self.unit_indexes(probe)
         spike_amplitudes_by_unit: list[npt.NDArray[np.floating]] = []
         for index in sorted(np.unique(unit_indexes)):
-            spike_amplitudes_by_unit.append(
-                spike_amplitudes[unit_indexes == index]
-            )
+            spike_amplitudes_by_unit.append(spike_amplitudes[unit_indexes == index])
         return tuple(spike_amplitudes_by_unit)
-    
+
     @functools.cache
     def unit_locations(self, probe: str) -> npt.NDArray[np.floating]:
         return np.load(
