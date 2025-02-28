@@ -447,8 +447,9 @@ class SpikeInterfaceKS25Data:
         )
 
     @functools.cache
-    def spike_amplitudes(self, probe: str) -> npt.NDArray[np.floating]:
-        return np.load(
+    def spike_amplitudes(self, probe: str) -> tuple[npt.NDArray[np.floating], ...]:
+        """array of amplitudes for each unit in order of unique('unit_indexes')"""
+        spike_amplitudes = np.load(
             io.BytesIO(
                 self.get_correct_path(
                     self.postprocessed(probe),
@@ -457,7 +458,14 @@ class SpikeInterfaceKS25Data:
                 ).read_bytes()
             )
         )
-
+        unit_indexes = self.unit_indexes(probe)
+        spike_amplitudes_by_unit: list[npt.NDArray[np.floating]] = []
+        for index in sorted(np.unique(unit_indexes)):
+            spike_amplitudes_by_unit.append(
+                spike_amplitudes[np.where(unit_indexes == index)[0]]
+            )
+        return tuple(spike_amplitudes_by_unit)
+    
     @functools.cache
     def unit_locations(self, probe: str) -> npt.NDArray[np.floating]:
         return np.load(
