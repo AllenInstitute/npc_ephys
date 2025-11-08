@@ -204,7 +204,7 @@ def _probe_idx(et: ET.ElementTree) -> tuple[int, ...]:
     if is_full_complement:
         return tuple(range(6))
     else:
-        idx = []
+        idx: list[int] = []
         for port_idx, slot in enumerate(sorted(set(slots))):
             current_ports = sorted([int(p) for s,p in zip(slots, ports) if int(s) == int(slot)])
             if current_ports == [2,3]:
@@ -212,7 +212,7 @@ def _probe_idx(et: ET.ElementTree) -> tuple[int, ...]:
             max_port = 4 if 4 in current_ports else 3
             port_shift: Literal[1] | Literal[0] = 1 if max_port == 4 else 0
             current_idx = np.array(current_ports) - 1 - port_shift
-            idx.extend(current_idx + port_idx * 3)
+            idx.extend((current_idx + port_idx * 3).tolist())
         return tuple(idx)   
 
 
@@ -221,7 +221,7 @@ def _probe_letters(
 ) -> tuple[Literal["A", "B", "C", "D", "E", "F"], ...]:
     probe_idx = _probe_idx(et)
     if all(np.diff(probe_idx) == 1) and len(probe_idx) == 6:
-        return tuple("ABCDEF")  # type: ignore [misc]
+        return tuple("ABCDEF")  # type: ignore [arg-type]
     return tuple("ABCDEF"[idx] for idx in probe_idx)  # type: ignore [misc]
 
 
