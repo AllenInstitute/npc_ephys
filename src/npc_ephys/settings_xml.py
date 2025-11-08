@@ -206,14 +206,18 @@ def _probe_idx(et: ET.ElementTree) -> tuple[int, ...]:
     else:
         idx: list[int] = []
         for port_idx, slot in enumerate(sorted(set(slots))):
-            current_ports = sorted([int(p) for s,p in zip(slots, ports) if int(s) == int(slot)])
-            if current_ports == [2,3]:
-                raise ValueError(f"Ambiguous behavior for {slot=}: cannot determine whether first probe was disconnected from port 1 or last probe from port 4 {current_ports}")
+            current_ports = sorted(
+                [int(p) for s, p in zip(slots, ports) if int(s) == int(slot)]
+            )
+            if current_ports == [2, 3]:
+                raise ValueError(
+                    f"Ambiguous behavior for {slot=}: cannot determine whether first probe was disconnected from port 1 or last probe from port 4 {current_ports}"
+                )
             max_port = 4 if 4 in current_ports else 3
             port_shift: Literal[1] | Literal[0] = 1 if max_port == 4 else 0
             current_idx = np.array(current_ports) - 1 - port_shift
             idx.extend((current_idx + port_idx * 3).tolist())
-        return tuple(idx)   
+        return tuple(idx)
 
 
 def _probe_letters(
