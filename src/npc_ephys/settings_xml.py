@@ -32,6 +32,7 @@ import xml.etree.ElementTree as ET
 from typing import Literal
 
 import npc_io
+import numpy as np
 import upath
 
 
@@ -195,23 +196,33 @@ def _probe_idx(et: ET.ElementTree) -> tuple[int, ...]:
 
     assumptions:
         - 2 slots
-        - 3 ports in use per slot
+        - 3 ports in use per slot (but from 11/1 onwards, probes may be in ports 2,3,4 rather than 1,2,3)
         - probes ABCDEF connected in sequence
     """
     slots, ports = _probe_attrib(et, "slot"), _probe_attrib(et, "port")
-    result = tuple(
-        (int(s) - int(min(slots))) * len(set(ports)) + int(p) - 1
-        for s, p in zip(slots, ports)
-    )
-    if not all(idx in range(6) for idx in result):
-        raise ValueError(f"probe_idx: {result!r}, slots: {slots}, ports: {ports}")
-    return result
+    is_full_complement = len(set(zip(slots, ports))) == 6
+    if is_full_complement:
+        return tuple(range(6))
+    else:
+        idx = []
+        for port_idx, slot in enumerate(sorted(set(slots))):
+            current_ports = sorted([int(p) for s,p in zip(slots, ports) if int(s) == int(slot)])
+            if current_ports == [2,3]:
+                raise ValueError(f"Ambiguous behavior for {slot=}: cannot determine whether first probe was disconnected from port 1 or last probe from port 4 {current_ports}")
+            max_port = 4 if 4 in current_ports else 3
+            port_shift: Literal[1] | Literal[0] = 1 if max_port == 4 else 0
+            current_idx = np.array(current_ports) - 1 - port_shift
+            idx.extend(current_idx + port_idx * 3)
+        return tuple(idx)   
 
 
 def _probe_letters(
     et: ET.ElementTree,
 ) -> tuple[Literal["A", "B", "C", "D", "E", "F"], ...]:
-    return tuple("ABCDEF"[idx] for idx in _probe_idx(et))  # type: ignore [misc]
+    probe_idx = _probe_idx(et)
+    if all(np.diff(probe_idx) == 1) and len(probe_idx) == 6:
+        return tuple("ABCDEF")  # type: ignore [misc]
+    return tuple("ABCDEF"[idx] for idx in probe_idx)  # type: ignore [misc]
 
 
 def _open_ephys_version(et: ET.ElementTree) -> str:
