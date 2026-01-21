@@ -93,7 +93,10 @@ def get_settings_xml_data(path: npc_io.PathLike | SettingsXmlInfo) -> SettingsXm
         channel_pos_xy=tuple(_probe_serial_number_to_channel_pos_xy(et).values()),
         is_tip_channel_bank=_is_tip_channel_bank(et),
         is_tip_referenced=_tip_referenced(et),
-        neuropix_pxi_version=_get_tag_attrib(et, "PROCESSOR", "libraryVersion", name="Neuropix-PXI") or "",
+        neuropix_pxi_version=_get_tag_attrib(
+            et, "PROCESSOR", "libraryVersion", name="Neuropix-PXI"
+        )
+        or "",
     )
 
 
@@ -106,7 +109,9 @@ def _get_tag_text(et: ET.ElementTree, tag: str) -> str | None:
     return str(result[0]) if (result and any(result)) else None
 
 
-def _get_tag_attrib(et: ET.ElementTree, tag: str, attrib: str, **condition_map) -> str | None:
+def _get_tag_attrib(
+    et: ET.ElementTree, tag: str, attrib: str, **condition_map
+) -> str | None:
     result = [
         element.attrib.get(attrib)
         for element in et.getroot().iter()
@@ -114,6 +119,7 @@ def _get_tag_attrib(et: ET.ElementTree, tag: str, attrib: str, **condition_map) 
         and all(element.attrib.get(k) == v for k, v in condition_map.items())
     ]
     return str(result[0]) if (result and any(result)) else None
+
 
 def _hostname(et: ET.ElementTree) -> str:
     result = (
@@ -160,6 +166,7 @@ def _probe_types(et: ET.ElementTree) -> tuple[str, ...]:
     except KeyError:
         return tuple("unknown" for _ in _probe_attrib_dicts(et))
 
+
 def _tip_referenced(et: ET.ElementTree) -> tuple[bool, ...]:
     """Whether each probe is tip-referenced.
 
@@ -168,6 +175,7 @@ def _tip_referenced(et: ET.ElementTree) -> tuple[bool, ...]:
     """
     ref_attribs = _probe_attrib(et, "referenceChannel")
     return tuple(ref.lower() == "tip" for ref in ref_attribs)
+
 
 def _probe_serial_number_to_channel_pos_xy(
     et: ET.ElementTree,

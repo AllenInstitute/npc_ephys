@@ -162,15 +162,21 @@ class SpikeInterfaceKS25Data:
     def aind_session(self) -> aind_session.Session:
         if self.session is not None:
             session_record = npc_session.SessionRecord(self.session)
-            return aind_session.get_sessions(subject_id=session_record.subject, date=session_record.date)[0]
+            return aind_session.get_sessions(
+                subject_id=session_record.subject, date=session_record.date
+            )[0]
         else:
             assert self.root is not None
-            data_description = json.loads((self.root / "data_description.json").read_text())
+            data_description = json.loads(
+                (self.root / "data_description.json").read_text()
+            )
             return aind_session.Session(data_description["name"])
 
     @functools.cached_property
     def settings_xml(self) -> settings_xml.SettingsXmlInfo:
-        return settings_xml.get_settings_xml_data(next(self.aind_session.ecephys.clipped_dir.iterdir()) / "settings.xml")
+        return settings_xml.get_settings_xml_data(
+            next(self.aind_session.ecephys.clipped_dir.iterdir()) / "settings.xml"
+        )
 
     @staticmethod
     def read_json(path: upath.UPath) -> dict:
@@ -531,6 +537,7 @@ class SpikeInterfaceKS25Data:
         recorded, for use in indexing into the electrode table.
         """
         is_one_indexed = self.settings_xml.neuropix_pxi_version < "0.7.0"
+
         def int_ids(recording_attributes_json: dict) -> tuple[int, ...]:
             """
             >>> int_ids({'channel_ids': ['AP1', '2', 'CH3', ]})
@@ -538,7 +545,8 @@ class SpikeInterfaceKS25Data:
             """
             values = tuple(
                 sorted(
-                    int("".join(i for i in str(id_) if i.isdigit())) - (1 if is_one_indexed else 0)
+                    int("".join(i for i in str(id_) if i.isdigit()))
+                    - (1 if is_one_indexed else 0)
                     for id_ in recording_attributes_json["channel_ids"]
                 )
             )
