@@ -13,6 +13,7 @@ import json
 import logging
 from typing import Union
 
+import aind_session
 import hdmf_zarr
 import npc_io
 import npc_lims
@@ -25,6 +26,8 @@ import pynwb
 import upath
 import zarr
 from typing_extensions import TypeAlias
+
+import npc_ephys.settings_xml as settings_xml
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +157,20 @@ class SpikeInterfaceKS25Data:
         if not path.exists():
             raise FileNotFoundError(f"{path} does not exist")
         return path
+
+    @functools.cached_property
+    def aind_session(self) -> aind_session.Session:
+        if self.session is not None:
+            session_record = npc_session.SessionRecord(self.session)
+            return aind_session.get_sessions(subject_id=session_record.subject, date=session_record.date)[0]
+        else:
+            assert self.root is not None
+            data_description = json.loads((self.root / "data_description.json").read_text())
+            return aind_session.Session(data_description["name"])
+
+    @functools.cached_property
+    def settings_xml(self) -> settings_xml.SettingsXmlInfo:
+        return settings_xml.get_settings_xml_data(next(self.aind_session.ecephys.clipped_dir.iterdir()) / "settings.xml")
 
     @staticmethod
     def read_json(path: upath.UPath) -> dict:
@@ -513,7 +530,7 @@ class SpikeInterfaceKS25Data:
         "AP384". This method returns the 0-indexed *integers* for each probe
         recorded, for use in indexing into the electrode table.
         """
-
+        is_one_indexed = self.settings_xml.neuropix_pxi_version < "0.7.0"
         def int_ids(recording_attributes_json: dict) -> tuple[int, ...]:
             """
             >>> int_ids({'channel_ids': ['AP1', '2', 'CH3', ]})
@@ -521,13 +538,14 @@ class SpikeInterfaceKS25Data:
             """
             values = tuple(
                 sorted(
-                    int("".join(i for i in str(id_) if i.isdigit())) - 1
+                    int("".join(i for i in str(id_) if i.isdigit())) - (1 if is_one_indexed else 0)
                     for id_ in recording_attributes_json["channel_ids"]
                 )
             )
-            assert (
-                m := min(values)
-            ) >= 0, f"Expected all channel_ids from SpikeInterface to be 1-indexed: min = {m + 1}"
+            if is_one_indexed:
+                assert (
+                    m := min(values)
+                ) >= 0, f"Expected all channel_ids from SpikeInterface to be 1-indexed (Neuropix-PXI = v{self.settings_xml.neuropix_pxi_version}): min channel ID = {m + 1}"
             return values
 
         return int_ids(self.recording_attributes_json(probe))

@@ -57,6 +57,7 @@ class SettingsXmlInfo:
     channel_pos_xy: tuple[dict[str, tuple[int, int]], ...]
     is_tip_channel_bank: tuple[bool, ...]
     """All channels are in the bank closest to the tip"""
+    neuropix_pxi_version: str
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, SettingsXmlInfo):
@@ -90,6 +91,7 @@ def get_settings_xml_data(path: npc_io.PathLike | SettingsXmlInfo) -> SettingsXm
         open_ephys_version=_open_ephys_version(et),
         channel_pos_xy=tuple(_probe_serial_number_to_channel_pos_xy(et).values()),
         is_tip_channel_bank=_is_tip_channel_bank(et),
+        neuropix_pxi_version=_get_tag_attrib(et, "PROCESSOR", "libraryVersion", name="Neuropix-PXI") or "",
     )
 
 
@@ -102,14 +104,14 @@ def _get_tag_text(et: ET.ElementTree, tag: str) -> str | None:
     return str(result[0]) if (result and any(result)) else None
 
 
-def _get_tag_attrib(et: ET.ElementTree, tag: str, attrib: str) -> str | None:
+def _get_tag_attrib(et: ET.ElementTree, tag: str, attrib: str, **condition_map) -> str | None:
     result = [
         element.attrib.get(attrib)
         for element in et.getroot().iter()
         if element.tag == tag.upper()
+        and all(element.attrib.get(k) == v for k, v in condition_map.items())
     ]
     return str(result[0]) if (result and any(result)) else None
-
 
 def _hostname(et: ET.ElementTree) -> str:
     result = (
