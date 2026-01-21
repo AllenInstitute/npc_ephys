@@ -57,6 +57,7 @@ class SettingsXmlInfo:
     channel_pos_xy: tuple[dict[str, tuple[int, int]], ...]
     is_tip_channel_bank: tuple[bool, ...]
     """All channels are in the bank closest to the tip"""
+    is_tip_referenced: tuple[bool, ...]
     neuropix_pxi_version: str
 
     def __eq__(self, other) -> bool:
@@ -91,6 +92,7 @@ def get_settings_xml_data(path: npc_io.PathLike | SettingsXmlInfo) -> SettingsXm
         open_ephys_version=_open_ephys_version(et),
         channel_pos_xy=tuple(_probe_serial_number_to_channel_pos_xy(et).values()),
         is_tip_channel_bank=_is_tip_channel_bank(et),
+        is_tip_referenced=_tip_referenced(et),
         neuropix_pxi_version=_get_tag_attrib(et, "PROCESSOR", "libraryVersion", name="Neuropix-PXI") or "",
     )
 
@@ -158,6 +160,14 @@ def _probe_types(et: ET.ElementTree) -> tuple[str, ...]:
     except KeyError:
         return tuple("unknown" for _ in _probe_attrib_dicts(et))
 
+def _tip_referenced(et: ET.ElementTree) -> tuple[bool, ...]:
+    """Whether each probe is tip-referenced.
+
+    Returns:
+        tuple of bool, one per probe
+    """
+    ref_attribs = _probe_attrib(et, "referenceChannel")
+    return tuple(ref.lower() == "tip" for ref in ref_attribs)
 
 def _probe_serial_number_to_channel_pos_xy(
     et: ET.ElementTree,
