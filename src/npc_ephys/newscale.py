@@ -86,9 +86,7 @@ def get_newscale_data(path: npc_io.PathLike) -> pl.DataFrame:
         # but it's slower than `ignore_errors` and sometimes still doesn't parse
         # dates correctly.
         # since we only have one column that needs parsing, this seems safe to use
-        return df.with_columns(
-            pl.col("last_movement_dt").str.to_datetime(strict=False)
-        )
+        return df.with_columns(pl.col("last_movement_dt").str.to_datetime(strict=False))
     except pl.exceptions.NoDataError:
         return pl.DataFrame()
 
