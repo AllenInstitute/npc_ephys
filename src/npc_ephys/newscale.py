@@ -76,19 +76,13 @@ def get_newscale_data(path: npc_io.PathLike) -> pl.DataFrame:
     >>> df = get_newscale_data('s3://aind-ephys-data/ecephys_686740_2023-10-23_14-11-05/behavior/log.csv')
     """
     try:
-        return pl.read_csv(
+        df = pl.read_csv(
             source=npc_io.from_pathlike(path).as_posix(),
             new_columns=NEWSCALE_LOG_COLUMNS,
-            try_parse_dates=True,
             ignore_errors=True,
-            schema_overrides={
-                "last_movement_dt": pl.Datetime,
-            },
-            # some log files have leading null values on first row, which cause date-parsing errors:
-            # alternative is to use `infer_schema_length=int(1e9)` to read more rows,
-            # but it's slower than `ignore_errors` and sometimes still doesn't parse
-            # dates correctly.
-            # since we only have one column that needs parsing, this seems safe to use
+        )
+        return df.with_columns(
+            pl.col("last_movement_dt").str.to_datetime(strict=False)
         )
     except pl.exceptions.NoDataError:
         return pl.DataFrame()
