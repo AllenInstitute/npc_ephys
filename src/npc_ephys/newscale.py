@@ -81,6 +81,9 @@ def get_newscale_data(path: npc_io.PathLike) -> pl.DataFrame:
             new_columns=NEWSCALE_LOG_COLUMNS,
             try_parse_dates=True,
             ignore_errors=True,
+            schema_overrides={
+                "last_movement_dt": pl.Datetime,
+            },
             # some log files have leading null values on first row, which cause date-parsing errors:
             # alternative is to use `infer_schema_length=int(1e9)` to read more rows,
             # but it's slower than `ignore_errors` and sometimes still doesn't parse
