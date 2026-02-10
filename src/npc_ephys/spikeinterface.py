@@ -14,7 +14,6 @@ import logging
 from typing import Union
 
 import aind_session
-import hdmf_zarr
 import npc_io
 import npc_lims
 import npc_session
@@ -22,7 +21,6 @@ import numpy as np
 import numpy.typing as npt
 import packaging.version
 import pandas as pd
-import pynwb
 import upath
 import zarr
 from typing_extensions import TypeAlias
@@ -447,11 +445,15 @@ class SpikeInterfaceKS25Data:
         return zarr.open(self.nwb_path, mode="r")
 
     @npc_io.cached_property
-    def nwb_file(self) -> pynwb.NWBFile:
+    def nwb_file(self):
+        """Returns pynwb.NWBFile, provided pynwb and hdmf-zarr are installed"""
+        try:
+            import hdmf_zarr
+        except ImportError:
+            raise ImportError(
+                "hdmf-zarr is required to output NWBFile object from SpikeInterface pipeline output. Please install with `npc-ephys[nwb]`"
+            ) from None
         return hdmf_zarr.NWBZarrIO(path=self.nwb_path.as_posix(), mode="r").read()
-
-        path = next((self.root / "nwb").glob("*.nwb"))
-        return hdmf_zarr.NWBZarrIO(path=path.as_posix(), mode="r").read()
 
     @functools.cache
     def default_qc(self, probe: str) -> npt.NDArray[np.floating]:
