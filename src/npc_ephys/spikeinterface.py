@@ -546,14 +546,14 @@ class SpikeInterfaceKS25Data:
             int("".join(i for i in str(id_) if i.isdigit()))
             for id_ in self.recording_attributes_json(probe)["channel_ids"]
         )
-        is_one_indexed = min(channel_indices) >= 1 and max(channel_indices) == 384
-        if not is_one_indexed:
-            if min(channel_indices) != 0 and max(channel_indices) != 383:
-                raise ValueError(
-                    f"Ambiguous channel IDs in {self} {probe=} recording_attributes.json."
-                    f"\nCannot determine if 0- or 1-indexed:"
-                    f"\n\tmin={min(channel_indices)}, max={max(channel_indices)}"
-                )
+        if min(channel_indices) != 0 and max(channel_indices) != 384:
+            raise AssertionError(
+                f"Ambiguous channel IDs in {self} {probe=} recording_attributes.json."
+                f"\nCannot determine if 0- or 1-indexed:"
+                f"\n\tmin={min(channel_indices)}, max={max(channel_indices)}"
+                "\nHint: try incorporating date of spike-sorting, 0-indexing appeared around Dec 2025.
+            )
+        is_one_indexed = min(channel_indices) == 1 or max(channel_indices) == 384
         if is_one_indexed:
             channel_indices = [i - 1 for i in channel_indices]
         return tuple(channel_indices)
