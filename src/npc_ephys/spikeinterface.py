@@ -534,31 +534,26 @@ class SpikeInterfaceKS25Data:
 
     @functools.cache
     def sparse_channel_indices(self, probe: str) -> tuple[int, ...]:
-        """SpikeInterface stores channels as 1-indexed integers: "AP1", ...,
-        "AP384". This method returns the 0-indexed *integers* for each probe
+        """SpikeInterface output from sorting used to consistently store channels
+        as 1-indexed integers: "AP1", ..., "AP384". 
+        As of December 2025, the pipeline may output 0-indexed integers instead - 
+        unclear where this change happened or how to detect it other than by checking the channel names.
+
+        This method returns the 0-indexed *integers* for each probe
         recorded, for use in indexing into the electrode table.
         """
-        is_one_indexed = self.settings_xml.neuropix_pxi_version < "0.7.0"
-
-        def int_ids(recording_attributes_json: dict) -> tuple[int, ...]:
-            """
-            >>> int_ids({'channel_ids': ['AP1', '2', 'CH3', ]})
-            (0, 1, 2)
-            """
-            values = tuple(
-                sorted(
-                    int("".join(i for i in str(id_) if i.isdigit()))
-                    - (1 if is_one_indexed else 0)
-                    for id_ in recording_attributes_json["channel_ids"]
+        channel_indices = sorted(int("".join(i for i in str(id_) if i.isdigit())) for id_ in self.recording_attributes_json(probe)["channel_ids"])
+        is_one_indexed = (min(channel_indices) >= 1) and max(channel_indices == 384)
+        if not is_one_indexed:
+            if min(channel_indices) != 0 and max(channel_indices) != 383:
+                raise ValueError(
+                    f"Ambiguous channel IDs in {self} {probe=} recording_attributes.json."
+                    f"\nCannot determine if 0- or 1-indexed:"
+                    f"\n\tmin={min(channel_indices)}, max={max(channel_indices)}"
                 )
-            )
-            if is_one_indexed:
-                assert (
-                    m := min(values)
-                ) >= 0, f"Expected all channel_ids from SpikeInterface to be 1-indexed (Neuropix-PXI = v{self.settings_xml.neuropix_pxi_version}): min channel ID = {m + 1}"
-            return values
-
-        return int_ids(self.recording_attributes_json(probe))
+        if is_one_indexed:
+            channel_indices = [i - 1 for i in channel_indices]
+        return tuple(channel_indices)
 
     @functools.cache
     def electrode_locations_xy(self, probe: str) -> npt.NDArray[np.floating]:
