@@ -17,7 +17,7 @@ dependencies = [
     "polars>=0.20.26",
     "pyarrow>=14.0",
 ]
-version = "0.1.42"
+version = "0.1.43"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
