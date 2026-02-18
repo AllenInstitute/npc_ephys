@@ -543,7 +543,7 @@ class SpikeInterfaceKS25Data:
         recorded, for use in indexing into the electrode table.
         """
         channel_indices = sorted(int("".join(i for i in str(id_) if i.isdigit())) for id_ in self.recording_attributes_json(probe)["channel_ids"])
-        is_one_indexed = (min(channel_indices) >= 1) and max(channel_indices == 384)
+        is_one_indexed = min(channel_indices) >= 1 and max(channel_indices) == 384
         if not is_one_indexed:
             if min(channel_indices) != 0 and max(channel_indices) != 383:
                 raise ValueError(
