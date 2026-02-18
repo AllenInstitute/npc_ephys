@@ -535,14 +535,17 @@ class SpikeInterfaceKS25Data:
     @functools.cache
     def sparse_channel_indices(self, probe: str) -> tuple[int, ...]:
         """SpikeInterface output from sorting used to consistently store channels
-        as 1-indexed integers: "AP1", ..., "AP384". 
-        As of December 2025, the pipeline may output 0-indexed integers instead - 
+        as 1-indexed integers: "AP1", ..., "AP384".
+        As of December 2025, the pipeline may output 0-indexed integers instead -
         unclear where this change happened or how to detect it other than by checking the channel names.
 
         This method returns the 0-indexed *integers* for each probe
         recorded, for use in indexing into the electrode table.
         """
-        channel_indices = sorted(int("".join(i for i in str(id_) if i.isdigit())) for id_ in self.recording_attributes_json(probe)["channel_ids"])
+        channel_indices = sorted(
+            int("".join(i for i in str(id_) if i.isdigit()))
+            for id_ in self.recording_attributes_json(probe)["channel_ids"]
+        )
         is_one_indexed = min(channel_indices) >= 1 and max(channel_indices) == 384
         if not is_one_indexed:
             if min(channel_indices) != 0 and max(channel_indices) != 383:
