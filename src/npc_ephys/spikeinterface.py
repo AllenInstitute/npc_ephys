@@ -551,7 +551,7 @@ class SpikeInterfaceKS25Data:
                 f"Ambiguous channel IDs in {self} {probe=} recording_attributes.json."
                 f"\nCannot determine if 0- or 1-indexed:"
                 f"\n\tmin={min(channel_indices)}, max={max(channel_indices)}"
-                "\nHint: try incorporating date of spike-sorting, 0-indexing appeared around Dec 2025.
+                "\nHint: try incorporating date of spike-sorting, 0-indexing appeared around Dec 2025."
             )
         is_one_indexed = min(channel_indices) == 1 or max(channel_indices) == 384
         if is_one_indexed:
