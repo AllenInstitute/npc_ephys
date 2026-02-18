@@ -536,9 +536,13 @@ class SpikeInterfaceKS25Data:
     def sparse_channel_indices(self, probe: str) -> tuple[int, ...]:
         """SpikeInterface output from sorting used to consistently store channels
         as 1-indexed integers: "AP1", ..., "AP384".
-        As of December 2025, the pipeline may output 0-indexed integers instead -
-        unclear where this change happened or how to detect it other than by checking the channel names.
-
+        
+        As of late 2025 and `libraryName="Neuropix-PXI" libraryVersion="0.7.0"` (in settings.xml),
+        Open Ephys started representing channels as 0-indexed in the GUI, and storing them this way
+        in the structure.oebin files (channels in settings.xml have always been 0-indexed).
+        Spikeinterface gets channel IDs from the structure.oebin files, so newer recordings 
+        may have 0-indexed channel IDs in the recording_attributes.json, but older ones will have 1-indexed channel IDs.
+        
         This method returns the 0-indexed *integers* for each probe
         recorded, for use in indexing into the electrode table.
         """
@@ -546,14 +550,7 @@ class SpikeInterfaceKS25Data:
             int("".join(i for i in str(id_) if i.isdigit()))
             for id_ in self.recording_attributes_json(probe)["channel_ids"]
         )
-        if min(channel_indices) != 0 and max(channel_indices) != 384:
-            raise AssertionError(
-                f"Ambiguous channel IDs in {self} {probe=} recording_attributes.json."
-                f"\nCannot determine if 0- or 1-indexed:"
-                f"\n\tmin={min(channel_indices)}, max={max(channel_indices)}"
-                "\nHint: try incorporating date of spike-sorting, 0-indexing appeared around Dec 2025."
-            )
-        is_one_indexed = min(channel_indices) == 1 or max(channel_indices) == 384
+        is_one_indexed = self.settings_xml.neuropix_pxi_version < "0.7.0"
         if is_one_indexed:
             channel_indices = [i - 1 for i in channel_indices]
         return tuple(channel_indices)
