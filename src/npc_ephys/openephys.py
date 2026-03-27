@@ -449,7 +449,10 @@ def get_ephys_timing_on_sync(
             / info.sampling_rate,
             off_times=info.device.ttl_sample_numbers[info.device.ttl_states < 0]
             / info.sampling_rate,
-            total_time_on_line=info.device.ttl_sample_numbers[-1] / info.sampling_rate,
+            total_time_on_line=(
+                info.device.ttl_sample_numbers[-1] / info.sampling_rate
+                if len(info.device.ttl_sample_numbers) > 0 else 0.0
+            ),
         )
 
         timeshift, sampling_rate, _ = npc_ephys.barcodes.get_probe_time_offset(
