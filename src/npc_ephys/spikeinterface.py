@@ -25,7 +25,7 @@ import upath
 import zarr
 from typing_extensions import TypeAlias
 
-import npc_ephys.settings_xml as settings_xml
+import npc_ephys.settings_xml as _settings_xml
 
 logger = logging.getLogger(__name__)
 
@@ -171,10 +171,12 @@ class SpikeInterfaceKS25Data:
             return aind_session.Session(data_description["name"])
 
     @functools.cached_property
-    def settings_xml(self) -> settings_xml.SettingsXmlInfo:
-        return settings_xml.get_settings_xml_data(
-            next(self.aind_session.ecephys.clipped_dir.iterdir()) / "settings.xml"
-        )
+    def settings_xml(self) -> _settings_xml.SettingsXmlInfo:
+        for record_node_dir in self.aind_session.ecephys.clipped_dir.iterdir():
+            settings_xml_path = next(record_node_dir.glob("settings*.xml"), None)
+            if settings_xml_path is not None and settings_xml_path.exists():
+                return _settings_xml.get_settings_xml_data(settings_xml_path)
+        raise FileNotFoundError(f"No settings XML files found in {self.aind_session.ecephys.clipped_dir}")
 
     @staticmethod
     def read_json(path: upath.UPath) -> dict:
