@@ -176,7 +176,9 @@ class SpikeInterfaceKS25Data:
             settings_xml_path = next(record_node_dir.glob("settings*.xml"), None)
             if settings_xml_path is not None and settings_xml_path.exists():
                 return _settings_xml.get_settings_xml_data(settings_xml_path)
-        raise FileNotFoundError(f"No settings XML files found in {self.aind_session.ecephys.clipped_dir}")
+        raise FileNotFoundError(
+            f"No settings XML files found in {self.aind_session.ecephys.clipped_dir}"
+        )
 
     @staticmethod
     def read_json(path: upath.UPath) -> dict:
