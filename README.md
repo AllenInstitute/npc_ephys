@@ -40,7 +40,7 @@ build tools to be installed: if `pip install npc_ephys` fails you'll likely need
 >>> si = npc_ephys.get_spikeinterface_data('670248_2023-08-03_0')
 
 >>> si
-SpikeInterfaceKS25Data(session='670248_2023-08-03_0', root=S3Path('s3://codeocean-s3datasetsbucket-1u41qdg42ur9/4797cab2-9ea2-4747-8d15-5ba064837c1c'))
+SpikeInterfaceData(session='670248_2023-08-03_0', root=S3Path('s3://codeocean-s3datasetsbucket-1u41qdg42ur9/4797cab2-9ea2-4747-8d15-5ba064837c1c'))
 
 # various bits of data are available for use:
 >>> si.version
@@ -59,6 +59,11 @@ array([      491,       738,       835, ..., 143124925, 143125165, 143125201])
 >>> si.unit_indexes('probeA')
 array([ 56,  61, 161, ..., 151,  72,  59])
 ```
+
+`make_units_table_from_spike_interface()` automatically reads either the legacy
+folder layout or the newer SpikeInterface `SortingAnalyzer` Zarr layout.
+`make_units_table_from_spike_interface_ks25()` remains available as a
+backwards-compatible alias.
 
 # Development
 See instructions in https://github.com/AllenInstitute/npc_ephys/CONTRIBUTING.md and the original template: https://github.com/AllenInstitute/copier-pdm-npc/blob/main/README.md

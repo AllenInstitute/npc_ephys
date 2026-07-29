@@ -3,6 +3,7 @@ from __future__ import annotations
 import concurrent.futures
 import dataclasses
 import logging
+import re
 from collections.abc import Iterable
 
 import npc_io
@@ -61,8 +62,8 @@ class AmplitudesWaveformsChannels:
             raise ValueError("All attributes must have same length")
 
 
-def get_amplitudes_waveforms_channels_ks25(
-    spike_interface_data: npc_ephys.spikeinterface.SpikeInterfaceKS25Data,
+def get_amplitudes_waveforms_channels(
+    spike_interface_data: npc_ephys.spikeinterface.SpikeInterfaceData,
     electrode_group_name: str,
 ) -> AmplitudesWaveformsChannels:
     unit_amplitudes: list[np.floating] = []
@@ -74,7 +75,10 @@ def get_amplitudes_waveforms_channels_ks25(
     sparse_channel_indices = spike_interface_data.sparse_channel_indices(
         electrode_group_name
     )
-    if spike_interface_data.is_nextflow_pipeline:
+    if (
+        spike_interface_data.is_nextflow_pipeline
+        and not spike_interface_data.is_analyzer
+    ):
         # faster data access
         _templates_mean = spike_interface_data.get_nwb_units_device_property(
             "waveform_mean", electrode_group_name
@@ -119,7 +123,7 @@ def get_amplitudes_waveforms_channels_ks25(
     )
 
 
-def get_waveform_sd_ks25(
+def get_waveform_sd(
     templates_std: npt.NDArray[np.floating],
 ) -> list[npt.NDArray[np.floating]]:
     unit_templates_std: list[npt.NDArray[np.floating]] = []
@@ -156,18 +160,17 @@ def get_units_x_spike_times(
 
 def _device_helper(
     device_timing_on_sync: npc_ephys.openephys.EphysTimingInfo,
-    spike_interface_data: npc_ephys.spikeinterface.SpikeInterfaceKS25Data,
+    spike_interface_data: npc_ephys.spikeinterface.SpikeInterfaceData,
     include_waveform_arrays: bool,
+    sorting_name: str,
 ) -> pd.DataFrame:
     electrode_group_name = npc_session.ProbeRecord(
         device_timing_on_sync.device.name
     ).name
-    spike_interface_data.electrode_locations_xy(electrode_group_name)
+    spike_interface_data.electrode_locations_xy(sorting_name)
 
-    df_device_metrics = spike_interface_data.quality_metrics_df(
-        electrode_group_name
-    ).merge(
-        spike_interface_data.template_metrics_df(electrode_group_name),
+    df_device_metrics = spike_interface_data.quality_metrics_df(sorting_name).merge(
+        spike_interface_data.template_metrics_df(sorting_name),
         left_index=True,
         right_index=True,
     )
@@ -175,26 +178,26 @@ def _device_helper(
     df_device_metrics["electrode_group_name"] = [str(electrode_group_name)] * len(
         df_device_metrics
     )
+    if match := re.search(r"_group(\d+)$", sorting_name):
+        df_device_metrics["shank"] = int(match.group(1))
 
-    awc = get_amplitudes_waveforms_channels_ks25(
+    awc = get_amplitudes_waveforms_channels(
         spike_interface_data=spike_interface_data,
-        electrode_group_name=electrode_group_name,
+        electrode_group_name=sorting_name,
     )
 
     df_device_metrics["peak_channel"] = awc.peak_channels
     cluster_id = df_device_metrics.index.to_list()
     assert np.array_equal(
-        cluster_id, spike_interface_data.original_cluster_id(electrode_group_name)
+        cluster_id, spike_interface_data.original_cluster_id(sorting_name)
     ), "cluster-ids from npy file do not match index column in metrics.csv"
     df_device_metrics["cluster_id"] = df_device_metrics.index.to_list()
-    df_device_metrics["default_qc"] = spike_interface_data.default_qc(
-        electrode_group_name
-    )
+    df_device_metrics["default_qc"] = spike_interface_data.default_qc(sorting_name)
     df_device_metrics["decoder_label"] = spike_interface_data.decoder_label(
-        electrode_group_name
+        sorting_name
     )
     df_device_metrics["decoder_probability"] = spike_interface_data.decoder_probability(
-        electrode_group_name
+        sorting_name
     )
     df_device_metrics["amplitude"] = awc.amplitudes
     if include_waveform_arrays:
@@ -202,7 +205,7 @@ def _device_helper(
         df_device_metrics["waveform_sd"] = awc.templates_sd
         df_device_metrics["channels"] = awc.channels
 
-    spike_times = spike_interface_data.spike_indexes(electrode_group_name)
+    spike_times = spike_interface_data.spike_indexes(sorting_name)
     if not device_timing_on_sync.device.is_sync_adjusted:
         spike_times_aligned = get_aligned_spike_times(
             spike_times,
@@ -211,7 +214,7 @@ def _device_helper(
     else:
         spike_times_aligned = spike_times
 
-    unit_indexes = spike_interface_data.unit_indexes(electrode_group_name)
+    unit_indexes = spike_interface_data.unit_indexes(sorting_name)
     units_x_spike_times = get_units_x_spike_times(
         spike_times=spike_times_aligned,
         unit_indexes=unit_indexes,
@@ -225,7 +228,7 @@ def _device_helper(
     ), "Mismatch between rows in spike_times and metrics.csv"
     df_device_metrics["spike_times"] = units_x_spike_times
     df_device_metrics["spike_amplitudes"] = spike_interface_data.spike_amplitudes(
-        electrode_group_name
+        sorting_name
     )
     assert all(
         len(df_device_metrics["spike_amplitudes"].iloc[i]) == len(spike_times)
@@ -235,20 +238,35 @@ def _device_helper(
     return df_device_metrics
 
 
-def make_units_table_from_spike_interface_ks25(
+def _is_ap_device_timing(
+    timing: npc_ephys.openephys.EphysTimingInfo,
+) -> bool:
+    """Include legacy ``-AP`` streams and newer unsuffixed 30 kHz probe streams."""
+    name = timing.device.name
+    if name.endswith("-LFP"):
+        return False
+    try:
+        npc_session.ProbeRecord(name)
+    except ValueError:
+        return False
+    return name.endswith("-AP") or timing.sampling_rate >= 10_000
+
+
+def make_units_table_from_spike_interface(
     session_or_spikeinterface_data_or_path: (
         str
         | npc_session.SessionRecord
         | npc_io.PathLike
-        | npc_ephys.spikeinterface.SpikeInterfaceKS25Data
+        | npc_ephys.spikeinterface.SpikeInterfaceData
     ),
     device_timing_on_sync: Iterable[npc_ephys.openephys.EphysTimingInfo],
     include_waveform_arrays: bool = False,
 ) -> pd.DataFrame:
-    """
+    """Make a units table from legacy or analyzer SpikeInterface output.
+
     >>> import npc_lims
     >>> device_timing_on_sync = npc_ephys.openephys.get_ephys_timing_on_sync(npc_lims.get_h5_sync_from_s3('662892_20230821'), npc_lims.get_recording_dirs_experiment_path_from_s3('662892_20230821'), only_devices_including='ProbeA')
-    >>> units = make_units_table_from_spike_interface_ks25('662892_20230821', device_timing_on_sync)
+    >>> units = make_units_table_from_spike_interface('662892_20230821', device_timing_on_sync)
     >>> len(units[units['electrode_group_name'] == 'probeA'])
     240
     """
@@ -257,28 +275,39 @@ def make_units_table_from_spike_interface_ks25(
     )
 
     devices_timing = tuple(
-        timing for timing in device_timing_on_sync if timing.device.name.endswith("-AP")
+        timing for timing in device_timing_on_sync if _is_ap_device_timing(timing)
     )
 
-    device_to_future: dict[str, concurrent.futures.Future] = {}
+    task_to_future: dict[tuple[str, str], concurrent.futures.Future[pd.DataFrame]] = {}
     with concurrent.futures.ThreadPoolExecutor() as executor:
         for device_timing in devices_timing:
-            device_to_future[device_timing.device.name] = executor.submit(
-                _device_helper,
-                device_timing,
-                spike_interface_data,
-                include_waveform_arrays,
+            sorting_names = spike_interface_data.sorting_names_for_device(
+                device_timing.device.name
             )
+            if not sorting_names:
+                sorting_names = (
+                    npc_session.ProbeRecord(device_timing.device.name).name,
+                )
+            for sorting_name in sorting_names:
+                task = (device_timing.device.name, sorting_name)
+                task_to_future[task] = executor.submit(
+                    _device_helper,
+                    device_timing,
+                    spike_interface_data,
+                    include_waveform_arrays,
+                    sorting_name,
+                )
 
         for future in tqdm.tqdm(
-            iterable=concurrent.futures.as_completed(device_to_future.values()),
+            iterable=concurrent.futures.as_completed(task_to_future.values()),
             desc="fetching units",
-            unit="device",
-            total=len(device_to_future),
+            unit="sorting",
+            total=len(task_to_future),
             ncols=80,
             ascii=False,
         ):
-            device = next(k for k, v in device_to_future.items() if v == future)
+            task = next(k for k, v in task_to_future.items() if v == future)
+            device, sorting_name = task
             session = spike_interface_data.session or ""
             try:
                 _ = future.result()
@@ -286,19 +315,27 @@ def make_units_table_from_spike_interface_ks25(
                 logger.warning(
                     f"Path to {session}{' ' if session else ''}{device} sorted data not found: likely skipped by SpikeInterface"
                 )
-                del device_to_future[device]
+                del task_to_future[task]
             except AssertionError as e:
-                logger.error(f"{session}{' ' if session else ''}{device}")
+                logger.error(
+                    f"{session}{' ' if session else ''}{device} ({sorting_name})"
+                )
                 raise e from None
             except Exception as e:
-                logger.error(f"{session}{' ' if session else ''}{device}")
+                logger.error(
+                    f"{session}{' ' if session else ''}{device} ({sorting_name})"
+                )
                 raise RuntimeError(
                     f"Error fetching units for {session} - see original exception above/below"
                 ) from e
 
-    return pd.concat(
-        device_to_future[device].result() for device in sorted(device_to_future.keys())
-    )
+    return pd.concat(task_to_future[task].result() for task in sorted(task_to_future))
+
+
+# Backwards-compatible names from when only Kilosort 2.5 output was supported.
+get_amplitudes_waveforms_channels_ks25 = get_amplitudes_waveforms_channels
+get_waveform_sd_ks25 = get_waveform_sd
+make_units_table_from_spike_interface_ks25 = make_units_table_from_spike_interface
 
 
 def add_electrode_annotations_to_units(
@@ -341,11 +378,18 @@ def add_global_unit_ids(
     session: str | npc_session.SessionRecord,
     unit_id_column: str = "unit_id",
 ) -> pd.DataFrame:
-    """Add session and probe letter"""
-    units[unit_id_column] = [
-        f"{session}_{row.electrode_group_name.replace('probe', '')}-{row['cluster_id']}"
-        for _, row in units.iterrows()
-    ]
+    """Add session, probe letter, optional shank, and cluster ID."""
+
+    def make_unit_id(row: pd.Series) -> str:
+        probe = row.electrode_group_name.replace("probe", "")
+        shank = (
+            f"-{int(row['shank'])}"
+            if "shank" in units.columns and pd.notna(row["shank"])
+            else ""
+        )
+        return f"{session}_{probe}{shank}-{row['cluster_id']}"
+
+    units[unit_id_column] = [make_unit_id(row) for _, row in units.iterrows()]
     return units
 
 

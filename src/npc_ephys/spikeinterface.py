@@ -1,7 +1,4 @@
-"""
-Helper functions for getting paths from spikeinterface output (developed for use
-with the aind kilosort 2.5 "pipeline" spike-sorting capsule).
-"""
+"""Read legacy and ``SortingAnalyzer`` SpikeInterface pipeline output."""
 
 from __future__ import annotations
 
@@ -11,7 +8,7 @@ import functools
 import io
 import json
 import logging
-from typing import Union
+from typing import Literal, Union
 
 import aind_session
 import npc_io
@@ -29,8 +26,8 @@ import npc_ephys.settings_xml as _settings_xml
 
 logger = logging.getLogger(__name__)
 
-SpikeInterfaceData: TypeAlias = Union[
-    str, npc_session.SessionRecord, npc_io.PathLike, "SpikeInterfaceKS25Data"
+SpikeInterfaceDataSource: TypeAlias = Union[
+    str, npc_session.SessionRecord, npc_io.PathLike, "SpikeInterfaceData"
 ]
 
 
@@ -39,34 +36,46 @@ class ProbeNotFoundError(FileNotFoundError):
 
 
 def get_spikeinterface_data(
-    session_or_root_path: SpikeInterfaceData,
-) -> SpikeInterfaceKS25Data:
-    """Return a SpikeInterfaceKS25Data object for a session.
+    session_or_root_path: SpikeInterfaceDataSource,
+) -> SpikeInterfaceData:
+    """Return format-agnostic SpikeInterface data for a session or result path.
 
     >>> paths = get_spikeinterface_data('668759_20230711')
     >>> paths.root == get_spikeinterface_data('s3://codeocean-s3datasetsbucket-1u41qdg42ur9/83754308-0a91-4b54-af79-3c42f6bc831b').root
     True
     """
-    if isinstance(session_or_root_path, SpikeInterfaceKS25Data):
+    if isinstance(session_or_root_path, SpikeInterfaceData):
         return session_or_root_path
-    try:
-        session = npc_session.SessionRecord(str(session_or_root_path))
-        root = None
-    except ValueError:
+
+    source = str(session_or_root_path)
+    is_explicit_path = (
+        not isinstance(session_or_root_path, (str, npc_session.SessionRecord))
+        or "://" in source
+        or "/" in source
+        or "\\" in source
+    )
+    if is_explicit_path:
         session = None
         root = npc_io.from_pathlike(session_or_root_path)
-    return SpikeInterfaceKS25Data(session=session, root=root)
+    else:
+        try:
+            session = npc_session.SessionRecord(source)
+            root = None
+        except ValueError:
+            session = None
+            root = npc_io.from_pathlike(session_or_root_path)
+    return SpikeInterfaceData(session=session, root=root)
 
 
 @dataclasses.dataclass(unsafe_hash=True, eq=True)
-class SpikeInterfaceKS25Data:
-    """The root directory of the result data asset produced by the 'pipeline'
-    KS2.5 sorting capsule contains `processing.json`, `postprocessed`,
-    `spikesorted`, etc. This class just simplifies access to the data in those
-    files and dirs.
+class SpikeInterfaceData:
+    """Data stored by a SpikeInterface sorting pipeline.
+
+    Both the legacy folder organization and the Zarr ``SortingAnalyzer``
+    organization are supported.
 
     Provide a session ID or a root path:
-    >>> si = SpikeInterfaceKS25Data('668759_20230711')
+    >>> si = SpikeInterfaceData('668759_20230711')
     >>> si.root
     S3Path('s3://codeocean-s3datasetsbucket-1u41qdg42ur9/83754308-0a91-4b54-af79-3c42f6bc831b')
 
@@ -94,7 +103,7 @@ class SpikeInterfaceKS25Data:
     array([ 36,  50,  55, ...,  52, 132,  53])
     >>> len(si.original_cluster_id('probeA'))
     139
-    >>> si = SpikeInterfaceKS25Data('712815_2024-05-21')
+    >>> si = SpikeInterfaceData('712815_2024-05-21')
     >>> si.is_nextflow_pipeline
     True
     """
@@ -125,14 +134,42 @@ class SpikeInterfaceKS25Data:
     @property
     def is_nextflow_pipeline(self) -> bool:
         if self.root is not None:
-            return (
-                "N E X T F L O W" in self.output().read_text()
-            )  # update to codeocean, where nextflow folder no longer part of result
+            with contextlib.suppress(FileNotFoundError):
+                return "N E X T F L O W" in self.output().read_text()
 
         return False
 
+    @functools.cache
+    def _analyzer_metadata(self, probe: str) -> dict:
+        with contextlib.suppress(FileNotFoundError):
+            metadata = self.read_json(
+                self.get_correct_path(
+                    self.postprocessed(probe=probe),
+                    ".zattrs",
+                )
+            )
+            if (
+                metadata.get("spikeinterface_info", {}).get("object")
+                == "SortingAnalyzer"
+            ):
+                return metadata
+        return {}
+
+    @property
+    def data_format(self) -> Literal["legacy", "analyzer"]:
+        """On-disk organization, independent of the spike sorter used."""
+        return "analyzer" if self._analyzer_metadata(str(self.probes[0])) else "legacy"
+
+    @property
+    def is_analyzer(self) -> bool:
+        return self.data_format == "analyzer"
+
     @property
     def version(self) -> str:
+        if self.is_analyzer:
+            return self._analyzer_metadata(str(self.probes[0]))["spikeinterface_info"][
+                "version"
+            ]
         if not self.is_nextflow_pipeline:
             return self.provenance(self.probes[0])["kwargs"]["parent_sorting"][
                 "version"
@@ -151,7 +188,14 @@ class SpikeInterfaceKS25Data:
         paths in general - run paths through this function to fix them."""
         if not path_components:
             raise ValueError("Must provide at least one path component")
-        path = npc_io.from_pathlike("/".join(str(path) for path in path_components))
+        path = npc_io.from_pathlike(path_components[0])
+        if path.protocol in ("", "file"):
+            for path_component in path_components[1:]:
+                path /= str(path_component)
+        else:
+            path = npc_io.from_pathlike(
+                "/".join(str(path_component) for path_component in path_components)
+            )
         if not path.exists():
             raise FileNotFoundError(f"{path} does not exist")
         return path
@@ -209,18 +253,26 @@ class SpikeInterfaceKS25Data:
             if not path.exists():
                 raise FileNotFoundError(f"{path} does not exist")
         else:
+            candidates = tuple(
+                path
+                for path in sorted(self.get_correct_path(self.root, dirname).iterdir())
+                if (excl_name_component is None or excl_name_component not in path.name)
+            )
+            target_name = str(probe).removesuffix(".zarr")
             path = next(
                 (
                     path
-                    for path in sorted(
-                        self.get_correct_path(self.root, dirname).iterdir()
-                    )
+                    for path in candidates
+                    if path.name.removesuffix(".zarr") == target_name
+                ),
+                None,
+            )
+            path = path or next(
+                (
+                    path
+                    for path in candidates
                     if npc_session.ProbeRecord(probe)
                     == npc_session.ProbeRecord(path.as_posix())
-                    and (
-                        excl_name_component is None
-                        or excl_name_component not in path.name
-                    )
                 ),
                 None,
             )
@@ -229,6 +281,34 @@ class SpikeInterfaceKS25Data:
                     f"{path} does not exist - sorting likely skipped by SpikeInterface due to fraction of bad channels"
                 )
         return path
+
+    @functools.cached_property
+    def sorting_names(self) -> tuple[str, ...]:
+        """Names of all probe/stream outputs in the postprocessed container."""
+        assert self.root is not None
+        postprocessed = self.get_correct_path(self.root, "postprocessed")
+        return tuple(
+            path.name.removesuffix(".zarr")
+            for path in sorted(postprocessed.iterdir())
+            if "sorting" not in path.name
+        )
+
+    def sorting_names_for_device(self, device_name: str) -> tuple[str, ...]:
+        """Return sorting outputs associated with an Open Ephys device name."""
+        exact_matches = tuple(
+            sorting_name
+            for sorting_name in self.sorting_names
+            if device_name.casefold() in sorting_name.casefold()
+        )
+        if exact_matches:
+            return exact_matches
+
+        probe = npc_session.ProbeRecord(device_name)
+        return tuple(
+            sorting_name
+            for sorting_name in self.sorting_names
+            if npc_session.ProbeRecord(sorting_name) == probe
+        )
 
     # json data
     processing_json = functools.partialmethod(get_json, "processing.json")
@@ -262,7 +342,36 @@ class SpikeInterfaceKS25Data:
         return self.get_path(dir_path.name, probe)
 
     @functools.cache
+    def sorting_analyzer(self, probe: str) -> zarr.hierarchy.Group:
+        """Open the probe's Zarr ``SortingAnalyzer`` store."""
+        if not self._analyzer_metadata(probe):
+            raise ValueError(f"{probe} uses the legacy SpikeInterface organization")
+        path = self.postprocessed(probe=probe)
+        store = path.fs.get_mapper(path.path)
+        try:
+            return zarr.open_consolidated(store, mode="r")
+        except (KeyError, ValueError):
+            return zarr.open(store, mode="r")
+
+    def _analyzer_extension(self, probe: str, extension: str) -> zarr.hierarchy.Group:
+        return self.sorting_analyzer(probe)[f"extensions/{extension}"]
+
+    def _analyzer_metrics_df(self, probe: str, extension: str) -> pd.DataFrame:
+        metrics = self._analyzer_extension(probe, extension)["metrics"]
+        index = np.asarray(metrics["index"])
+        data = {
+            name: np.asarray(metrics[name])
+            for name in metrics.array_keys()
+            if name != "index"
+        }
+        return pd.DataFrame(data, index=index)
+
+    @functools.cache
     def quality_metrics_dict(self, probe: str) -> dict:
+        if self._analyzer_metadata(probe):
+            return dict(
+                self._analyzer_extension(probe, "quality_metrics").attrs["params"]
+            )
         return self.read_json(
             self.get_correct_path(
                 self.postprocessed(probe=probe), "quality_metrics", "params.json"
@@ -271,12 +380,16 @@ class SpikeInterfaceKS25Data:
 
     @functools.cache
     def postprocessed_params_dict(self, probe: str) -> dict:
+        if self._analyzer_metadata(probe):
+            return dict(self.sorting_analyzer(probe).attrs.get("settings", {}))
         return self.read_json(
             self.get_correct_path(self.postprocessed(probe=probe), "params.json")
         )
 
     @functools.cache
     def quality_metrics_df(self, probe: str) -> pd.DataFrame:
+        if self._analyzer_metadata(probe):
+            return self._analyzer_metrics_df(probe, "quality_metrics")
         return self.read_csv(
             self.get_correct_path(
                 self.postprocessed(probe=probe), "quality_metrics", "metrics.csv"
@@ -285,6 +398,10 @@ class SpikeInterfaceKS25Data:
 
     @functools.cache
     def template_metrics_dict(self, probe: str) -> dict:
+        if self._analyzer_metadata(probe):
+            return dict(
+                self._analyzer_extension(probe, "template_metrics").attrs["params"]
+            )
         return self.read_json(
             self.get_correct_path(
                 self.postprocessed(probe=probe), "template_metrics", "params.json"
@@ -293,6 +410,8 @@ class SpikeInterfaceKS25Data:
 
     @functools.cache
     def template_metrics_df(self, probe: str) -> pd.DataFrame:
+        if self._analyzer_metadata(probe):
+            return self._analyzer_metrics_df(probe, "template_metrics")
         return self.read_csv(
             self.get_correct_path(
                 self.postprocessed(probe=probe), "template_metrics", "metrics.csv"
@@ -300,7 +419,9 @@ class SpikeInterfaceKS25Data:
         )
 
     def templates_average(self, probe: str) -> npt.NDArray[np.floating]:
-        logger.debug("Loading templates_average.npy for %s - typically ~200 MB", probe)
+        logger.debug("Loading average templates for %s - typically ~200 MB", probe)
+        if self._analyzer_metadata(probe):
+            return np.asarray(self._analyzer_extension(probe, "templates")["average"])
         return np.load(
             io.BytesIO(
                 self.get_correct_path(
@@ -310,7 +431,9 @@ class SpikeInterfaceKS25Data:
         )
 
     def templates_std(self, probe: str) -> npt.NDArray[np.floating]:
-        logger.debug("Loading templates_std.npy for %s - typically ~200 MB", probe)
+        logger.debug("Loading template standard deviations for %s", probe)
+        if self._analyzer_metadata(probe):
+            return np.asarray(self._analyzer_extension(probe, "templates")["std"])
         return np.load(
             io.BytesIO(
                 self.get_correct_path(
@@ -340,6 +463,21 @@ class SpikeInterfaceKS25Data:
 
     @functools.cache
     def sparsity(self, probe: str) -> dict:
+        if self._analyzer_metadata(probe):
+            analyzer = self.sorting_analyzer(probe)
+            mask = np.asarray(analyzer["sparsity_mask"])
+            unit_ids = np.asarray(analyzer["sorting/unit_ids"])
+            channel_ids = self.recording_attributes_json(probe)["channel_ids"]
+            return {
+                "unit_id_to_channel_ids": {
+                    unit_id.item() if hasattr(unit_id, "item") else unit_id: [
+                        channel_ids[index] for index in np.flatnonzero(mask[unit_index])
+                    ]
+                    for unit_index, unit_id in enumerate(unit_ids)
+                },
+                "channel_ids": list(channel_ids),
+                "unit_ids": unit_ids.tolist(),
+            }
         return self.read_json(
             self.get_correct_path(self.postprocessed(probe=probe), "sparsity.json")
         )
@@ -359,6 +497,15 @@ class SpikeInterfaceKS25Data:
         """format: array[(sample_index, unit_index, segment_index), ...]"""
         if self.is_pre_v0_99:
             raise AttributeError("spikes.npy not used for SpikeInterface<0.99")
+        if self._analyzer_metadata(probe):
+            analyzer = self.sorting_analyzer(probe)
+            if analyzer["sorting"].attrs["num_segments"] > 1:
+                raise AttributeError("num_segments > 1 not supported yet")
+            sample_indexes = np.asarray(analyzer["sorting/spikes/sample_index"])
+            unit_indexes = np.asarray(analyzer["sorting/spikes/unit_index"])
+            return np.column_stack(
+                (sample_indexes, unit_indexes, np.zeros_like(sample_indexes))
+            )
         if self.numpysorting_info(probe)["num_segments"] > 1:
             raise AttributeError("num_segments > 1 not supported yet")
         return np.load(
@@ -369,27 +516,31 @@ class SpikeInterfaceKS25Data:
 
     @functools.cache
     def spike_indexes(self, probe: str) -> npt.NDArray[np.floating]:
-        if self.is_pre_v0_99:
+        if self._analyzer_metadata(probe):
+            original = np.asarray(
+                self.sorting_analyzer(probe)["sorting/spikes/sample_index"]
+            )
+        elif self.is_pre_v0_99:
             original = self.sorting_cached(probe)["spike_indexes_seg0"]
         else:
-            original = np.array([v[0] for v in self.spikes_npy(probe)])
+            original = self.spikes_npy(probe)[:, 0]
         return original
 
     @functools.cache
     def unit_indexes(self, probe: str) -> npt.NDArray[np.int64]:
-        if self.is_pre_v0_99:
+        if self._analyzer_metadata(probe):
+            original = np.asarray(
+                self.sorting_analyzer(probe)["sorting/spikes/unit_index"]
+            )
+        elif self.is_pre_v0_99:
             original = self.sorting_cached(probe)["spike_labels_seg0"]
         else:
-            original = np.array([v[1] for v in self.spikes_npy(probe)])
-        return original
+            original = self.spikes_npy(probe)[:, 1]
+        return original.astype(np.int64, copy=False)
 
     @functools.cache
     def cluster_indexes(self, probe: str) -> npt.NDArray[np.int64]:
-        return np.take_along_axis(
-            self.unit_indexes(probe, de_duplicated=False),
-            self.original_cluster_id(probe),
-            axis=0,
-        )
+        return self.original_cluster_id(probe)[self.unit_indexes(probe)]
 
     def device_indices_in_nwb_units(
         self, probe: str | npc_session.ProbeRecord
@@ -412,13 +563,17 @@ class SpikeInterfaceKS25Data:
     @functools.cache
     def original_cluster_id(self, probe: str) -> npt.NDArray[np.int64]:
         """Array of cluster IDs, one per unit in unique('unit_indexes')"""
+        if self._analyzer_metadata(probe):
+            return self._sorting_property(probe, "original_cluster_id").astype(
+                np.int64, copy=False
+            )
         if self.is_nextflow_pipeline:
             return self.get_nwb_units_device_property("ks_unit_id", probe).astype(
                 np.int64
             )
 
         with contextlib.suppress(FileNotFoundError):
-            return np.array(
+            return np.load(
                 io.BytesIO(
                     self.get_correct_path(
                         self.curated(probe),
@@ -426,14 +581,15 @@ class SpikeInterfaceKS25Data:
                         "original_cluster_id.npy",
                     ).read_bytes()
                 )
-            )
+            ).astype(np.int64, copy=False)
 
         if self.is_pre_v0_99:
             # TODO! verify this is correct
             return self.sorting_cached(probe)["unit_ids"]
 
         raise ValueError(
-            f"Unknown format of sorted output for SI {self.version=}, {self.is_nextflow_pipeline=}. As of March 2024 only handles 0.100 and lower"
+            f"Unknown format of sorted output for SI {self.version=}, "
+            f"{self.is_nextflow_pipeline=}"
         )
 
     @npc_io.cached_property
@@ -446,7 +602,10 @@ class SpikeInterfaceKS25Data:
 
     @npc_io.cached_property
     def nwb_zarr(self) -> zarr.hierarchy.Group:
-        return zarr.open(self.nwb_path, mode="r")
+        return zarr.open(
+            self.nwb_path.fs.get_mapper(self.nwb_path.path),
+            mode="r",
+        )
 
     @npc_io.cached_property
     def nwb_file(self):
@@ -460,48 +619,49 @@ class SpikeInterfaceKS25Data:
         return hdmf_zarr.NWBZarrIO(path=self.nwb_path.as_posix(), mode="r").read()
 
     @functools.cache
-    def default_qc(self, probe: str) -> npt.NDArray[np.floating]:
-        return np.load(
-            io.BytesIO(
-                self.get_correct_path(
-                    self.curated(probe), "properties", "default_qc.npy"
-                ).read_bytes()
+    def _sorting_property(self, probe: str, name: str) -> npt.NDArray:
+        if self._analyzer_metadata(probe):
+            return np.asarray(
+                self.sorting_analyzer(probe)[f"sorting/properties/{name}"]
             )
-        )
-
-    @functools.cache
-    def decoder_probability(self, probe: str) -> npt.NDArray[np.floating]:
         return np.load(
             io.BytesIO(
                 self.get_correct_path(
-                    self.curated(probe), "properties", "decoder_probability.npy"
-                ).read_bytes()
-            )
-        )
-
-    @functools.cache
-    def decoder_label(self, probe: str) -> npt.NDArray[np.str_]:
-        return np.load(
-            io.BytesIO(
-                self.get_correct_path(
-                    self.curated(probe), "properties", "decoder_label.npy"
+                    self.curated(probe), "properties", f"{name}.npy"
                 ).read_bytes()
             ),
             allow_pickle=True,
         )
 
     @functools.cache
+    def default_qc(self, probe: str) -> npt.NDArray[np.bool_]:
+        return self._sorting_property(probe, "default_qc").astype(np.bool_, copy=False)
+
+    @functools.cache
+    def decoder_probability(self, probe: str) -> npt.NDArray[np.floating]:
+        return self._sorting_property(probe, "decoder_probability")
+
+    @functools.cache
+    def decoder_label(self, probe: str) -> npt.NDArray[np.str_]:
+        return self._sorting_property(probe, "decoder_label")
+
+    @functools.cache
     def spike_amplitudes(self, probe: str) -> tuple[npt.NDArray[np.floating], ...]:
         """array of amplitudes for each unit in order of unique('unit_indexes')"""
-        spike_amplitudes = np.load(
-            io.BytesIO(
-                self.get_correct_path(
-                    self.postprocessed(probe=probe),
-                    "spike_amplitudes",
-                    "amplitude_segment_0.npy",
-                ).read_bytes()
+        if self._analyzer_metadata(probe):
+            spike_amplitudes = np.asarray(
+                self._analyzer_extension(probe, "spike_amplitudes")["amplitudes"]
             )
-        )
+        else:
+            spike_amplitudes = np.load(
+                io.BytesIO(
+                    self.get_correct_path(
+                        self.postprocessed(probe=probe),
+                        "spike_amplitudes",
+                        "amplitude_segment_0.npy",
+                    ).read_bytes()
+                )
+            )
         unit_indexes = self.unit_indexes(probe)
         spike_amplitudes_by_unit: list[npt.NDArray[np.floating]] = []
         for index in sorted(np.unique(unit_indexes)):
@@ -510,6 +670,10 @@ class SpikeInterfaceKS25Data:
 
     @functools.cache
     def unit_locations(self, probe: str) -> npt.NDArray[np.floating]:
+        if self._analyzer_metadata(probe):
+            return np.asarray(
+                self._analyzer_extension(probe, "unit_locations")["unit_locations"]
+            )
         return np.load(
             io.BytesIO(
                 self.get_correct_path(
@@ -522,12 +686,20 @@ class SpikeInterfaceKS25Data:
 
     @functools.cache
     def sorting_json(self, probe: str) -> dict:
+        if self._analyzer_metadata(probe):
+            return dict(self.sorting_analyzer(probe)["sorting"].attrs)
         return self.read_json(
             self.get_correct_path(self.postprocessed(probe=probe), "sorting.json")
         )
 
     @functools.cache
     def recording_attributes_json(self, probe: str) -> dict:
+        if self._analyzer_metadata(probe):
+            return dict(
+                self.sorting_analyzer(probe)["recording_info"].attrs[
+                    "recording_attributes"
+                ]
+            )
         return self.read_json(
             self.get_correct_path(
                 self.postprocessed(probe=probe),
@@ -554,7 +726,14 @@ class SpikeInterfaceKS25Data:
             int("".join(i for i in str(id_) if i.isdigit()))
             for id_ in self.recording_attributes_json(probe)["channel_ids"]
         )
-        is_one_indexed = self.settings_xml.neuropix_pxi_version < "0.7.0"
+        if self._analyzer_metadata(probe):
+            is_one_indexed = False
+        elif channel_indices == list(range(len(channel_indices))):
+            is_one_indexed = False
+        elif channel_indices == list(range(1, len(channel_indices) + 1)):
+            is_one_indexed = True
+        else:
+            is_one_indexed = self.settings_xml.neuropix_pxi_version < "0.7.0"
         if is_one_indexed:
             channel_indices = [i - 1 for i in channel_indices]
         return tuple(channel_indices)
@@ -566,6 +745,10 @@ class SpikeInterfaceKS25Data:
                 "properties"
             ]["location"]
         )
+
+
+# Backwards compatibility for callers written when only KS2.5 output was supported.
+SpikeInterfaceKS25Data = SpikeInterfaceData
 
 
 if __name__ == "__main__":
