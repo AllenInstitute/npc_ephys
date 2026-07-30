@@ -240,6 +240,31 @@ def test_format_specific_storage_has_common_interface(
     np.testing.assert_array_equal(amplitudes[1], SPIKE_AMPLITUDES[[1]])
 
 
+def test_legacy_structured_spikes_array(tmp_path: Path) -> None:
+    root = tmp_path / "legacy-structured"
+    root.mkdir()
+    curated = _write_common_sorting(root)
+    (root / "output").write_text("legacy pipeline")
+    _write_json(
+        curated / "provenance.json",
+        {"kwargs": {"parent_sorting": {"version": "0.100.0"}}},
+    )
+    structured_spikes = np.array(
+        list(zip(SAMPLE_INDEXES, UNIT_INDEXES, np.zeros_like(SAMPLE_INDEXES))),
+        dtype=[
+            ("sample_index", "<i8"),
+            ("unit_index", "<i8"),
+            ("segment_index", "<i8"),
+        ],
+    )
+    np.save(curated / "spikes.npy", structured_spikes)
+
+    data = SpikeInterfaceData(root=root)
+
+    np.testing.assert_array_equal(data.spike_indexes("probeA"), SAMPLE_INDEXES)
+    np.testing.assert_array_equal(data.unit_indexes("probeA"), UNIT_INDEXES)
+
+
 def test_sorting_names_match_exact_device_and_all_grouped_outputs(
     tmp_path: Path,
 ) -> None:

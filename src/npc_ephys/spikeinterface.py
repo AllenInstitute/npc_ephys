@@ -8,7 +8,7 @@ import functools
 import io
 import json
 import logging
-from typing import Literal, Union
+from typing import Any, Literal, Union, cast
 
 import aind_session
 import npc_io
@@ -97,10 +97,10 @@ class SpikeInterfaceData:
     '0.100.0'
     >>> ''.join(si.probes)
     'ABCDEF'
-    >>> si.spike_indexes('probeA')
-    array([      145,       491,       738, ..., 143124925, 143125165, 143125201])
-    >>> si.unit_indexes('probeA')
-    array([ 36,  50,  55, ...,  52, 132,  53])
+    >>> si.spike_indexes('probeA')[[0, 1, 2, -3, -2, -1]].tolist()
+    [145, 491, 738, 143124925, 143125165, 143125201]
+    >>> si.unit_indexes('probeA')[[0, 1, 2, -3, -2, -1]].tolist()
+    [36, 50, 55, 52, 132, 53]
     >>> len(si.original_cluster_id('probeA'))
     139
     >>> si = SpikeInterfaceData('712815_2024-05-21')
@@ -523,7 +523,12 @@ class SpikeInterfaceData:
         elif self.is_pre_v0_99:
             original = self.sorting_cached(probe)["spike_indexes_seg0"]
         else:
-            original = self.spikes_npy(probe)[:, 0]
+            spikes = self.spikes_npy(probe)
+            original = (
+                cast(Any, spikes)["sample_index"]
+                if spikes.dtype.names is not None
+                else spikes[:, 0]
+            )
         return original
 
     @functools.cache
@@ -535,7 +540,12 @@ class SpikeInterfaceData:
         elif self.is_pre_v0_99:
             original = self.sorting_cached(probe)["spike_labels_seg0"]
         else:
-            original = self.spikes_npy(probe)[:, 1]
+            spikes = self.spikes_npy(probe)
+            original = (
+                cast(Any, spikes)["unit_index"]
+                if spikes.dtype.names is not None
+                else spikes[:, 1]
+            )
         return original.astype(np.int64, copy=False)
 
     @functools.cache
