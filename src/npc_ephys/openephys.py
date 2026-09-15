@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_PROBES = "ABCDEF"
 TIMESTAMPS_ADJUSTED_FLAG_FILENAME = "TIMESTAMPS_ADJUSTED.flag"
+BARCODE_TTL_CHANNEL = 1
 
 
 def get_sync_messages_data(
@@ -80,7 +81,7 @@ class EphysDeviceInfo:
     """Sample numbers on open ephys clock, after subtracting first sample reported in
     sync_messages.txt"""
     ttl_states: npt.NDArray
-    """Contents of ttl/states.npy"""
+    """Signed TTL channel IDs from ttl/states.npy; the sign indicates edge polarity."""
 
     @npc_io.cached_property
     def num_samples(self) -> int:
@@ -445,9 +446,13 @@ def get_ephys_timing_on_sync(
             ephys_barcode_times,
             ephys_barcode_ids,
         ) = npc_ephys.barcodes.extract_barcodes_from_times(
-            on_times=info.device.ttl_sample_numbers[info.device.ttl_states > 0]
+            on_times=info.device.ttl_sample_numbers[
+                info.device.ttl_states == BARCODE_TTL_CHANNEL
+            ]
             / info.sampling_rate,
-            off_times=info.device.ttl_sample_numbers[info.device.ttl_states < 0]
+            off_times=info.device.ttl_sample_numbers[
+                info.device.ttl_states == -BARCODE_TTL_CHANNEL
+            ]
             / info.sampling_rate,
             total_time_on_line=(
                 info.device.ttl_sample_numbers[-1] / info.sampling_rate
