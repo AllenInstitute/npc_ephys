@@ -8,13 +8,21 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 <!-- insertion marker -->
 ## Unreleased
 
-<small>[Compare with latest](https://github.com/AllenInstitute/npc_ephys/compare/v0.1.50...HEAD)</small>
+<small>[Compare with latest](https://github.com/AllenInstitute/npc_ephys/compare/v0.1.51...HEAD)</small>
+
+### Added
+
+- Add specific type-ignores for UPath args (memmap, get_ephys_timing_on_pxi) ([5498530](https://github.com/AllenInstitute/npc_ephys/commit/5498530abbdbe116e20a058ef7fb5fc51a2c749c) by bjhardcastle).
+
+<!-- insertion marker -->
+## [v0.1.51](https://github.com/AllenInstitute/npc_ephys/releases/tag/v0.1.51) - 2026-11-18
+
+<small>[Compare with v0.1.50](https://github.com/AllenInstitute/npc_ephys/compare/v0.1.50...v0.1.51)</small>
 
 ### Fixed
 
 - Fix zarr.open on cloud UPaths for zarr 2 and 3 (closes #6) ([891e4d8](https://github.com/AllenInstitute/npc_ephys/commit/891e4d89351a4f5798d7679aa9a1c71a7e20601c) by bjhardcastle).
 
-<!-- insertion marker -->
 ## [v0.1.50](https://github.com/AllenInstitute/npc_ephys/releases/tag/v0.1.50) - 2026-11-18
 
 <small>[Compare with v0.1.49](https://github.com/AllenInstitute/npc_ephys/compare/v0.1.49...v0.1.50)</small>
