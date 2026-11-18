@@ -53,8 +53,12 @@ is treated as mispaired (barcodes are ~30 s apart, so a real mispair is >= ~30 s
 
 MIN_PAIRED_BARCODES = 10
 MAX_REJECTED_FRACTION = 0.05
-DEFAULT_MAX_RESIDUAL_MS: dict[str, float] = {"AP": 0.5, "LFP": 0.8, "NI-DAQ": 0.5}
-"""Gate T on the leave-one-out residual at barcodes, per stream type (see report)."""
+DEFAULT_MAX_RESIDUAL_MS: dict[str, float] = {"AP": 1.0, "LFP": 1.0, "NI-DAQ": 1.0}
+"""Gate T on the max leave-one-out residual at barcodes (absolute timing error at any barcode,
+not cumulative), per stream type. 1 ms agreed 2026-11-18: above every clean and drop-corrected
+device in the survey (max 0.43 ms AP, 0.61 ms LFP, 0.33 ms NI-DAQ). Deliberately decoupled from
+DEFAULT_STEP_THRESHOLD_MS, which stays tighter so that unlogged losses > 0.5 ms still become
+invalid intervals."""
 DEFAULT_STEP_THRESHOLD_MS: dict[str, float] = {"AP": 0.5, "LFP": 0.8, "NI-DAQ": 0.5}
 """Unexplained steps between consecutive barcodes larger than this become unlogged drops
 (upward) or fail the device (downward)."""
