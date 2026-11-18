@@ -12,7 +12,7 @@ dependencies = [
     "numcodecs<0.16",
     "pandas>=2.2.0",
     "tqdm>=4.66.1",
-    "npc-lims>=0.1.73",
+    "npc-lims>=0.1.203",
     "wavpack-numcodecs>=0.1.5,!=0.2.0",
     "npc-io>=0.1.34",
     "polars>=0.20.26",
