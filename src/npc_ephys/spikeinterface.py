@@ -8,7 +8,7 @@ import functools
 import io
 import json
 import logging
-from typing import Any, Literal, Union, cast
+from typing import Any, Literal, TypeAlias, Union, cast
 
 import aind_session
 import npc_io
@@ -20,7 +20,6 @@ import packaging.version
 import pandas as pd
 import upath
 import zarr
-from typing_extensions import TypeAlias
 
 import npc_ephys.settings_xml as _settings_xml
 

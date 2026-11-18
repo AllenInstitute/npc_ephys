@@ -1,5 +1,5 @@
 """
-    Tools for accessing and processing raw ephys data, compatible with data in the cloud.
+Tools for accessing and processing raw ephys data, compatible with data in the cloud.
 """
 
 import doctest

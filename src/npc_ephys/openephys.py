@@ -192,9 +192,11 @@ class EphysTimingInfoOnSync:
         if not self.drops:
             return self.start_time + k / self.sampling_rate
         pos, n = (np.array(v, dtype=float) for v in zip(*self.drops))
-        return self.start_time + (
-            k + npc_ephys.sample_drops.cumulative_loss(pos, n, k)
-        ) / self.sampling_rate
+        return (
+            self.start_time
+            + (k + npc_ephys.sample_drops.cumulative_loss(pos, n, k))
+            / self.sampling_rate
+        )
 
     @property
     def stop_time(self) -> float:
@@ -658,7 +660,9 @@ def get_ephys_timing_on_sync(
         ):
             ap_info, ap_fit = ap_fits[ap_name]
             ratio = _ap_to_lfp_ratio(info)
-            pos = (ap_fit.drop_positions + ap_info.start_sample) / ratio - info.start_sample
+            pos = (
+                ap_fit.drop_positions + ap_info.start_sample
+            ) / ratio - info.start_sample
             sizes = ap_fit.drop_sizes / ratio
             refine = False
             inherited = ap_fit.invalid_intervals
@@ -914,7 +918,7 @@ def get_superfluous_oebin_paths(path: npc_io.PathLike) -> tuple[upath.UPath, ...
     if len(all_oebin_paths) == 1:
         return ()
 
-    return tuple(set(all_oebin_paths) - {(get_single_oebin_path(path))})
+    return tuple(set(all_oebin_paths) - {get_single_oebin_path(path)})
 
 
 def assert_xml_files_match(*path: npc_io.PathLike) -> None:

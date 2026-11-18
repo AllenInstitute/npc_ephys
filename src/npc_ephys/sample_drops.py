@@ -30,7 +30,7 @@ import dataclasses
 import io
 import logging
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from typing import Literal
 
 import npc_io
@@ -100,7 +100,9 @@ def parse_drop_messages(
     return np.array(sorted(rows), dtype=np.int64).reshape(-1, 4)
 
 
-def is_timestamp_reset(sample_number: npt.ArrayLike, ticks: npt.ArrayLike) -> npt.NDArray[np.bool_]:
+def is_timestamp_reset(
+    sample_number: npt.ArrayLike, ticks: npt.ArrayLike
+) -> npt.NDArray[np.bool_]:
     """Jumps that are not data loss: the 'jump' is (about) the whole headstage timestamp, ie the
     previous timestamp was zero/invalid. These have J >= half the ticks elapsed since acquisition
     start (J ~ 10/3 * N in practice). A real loss that large would remove more than had been
@@ -139,7 +141,11 @@ def get_probe_slot_port(
     text = npc_io.from_pathlike(settings_xml).read_text(errors="ignore")
     for m in re.finditer(r"<NP_PROBE (.*?)>", text, re.S):
         attrs = dict(re.findall(r'(\w+)="([^"]*)"', m.group(1)))
-        if attrs.get("custom_probe_name") == probe_name and "slot" in attrs and "port" in attrs:
+        if (
+            attrs.get("custom_probe_name") == probe_name
+            and "slot" in attrs
+            and "port" in attrs
+        ):
             return int(attrs["slot"]), int(attrs["port"])
     return None
 
@@ -171,7 +177,9 @@ def read_drop_messages(recording_dir: npc_io.PathLike) -> npt.NDArray[np.int64]:
 
 
 def cumulative_loss(
-    drop_positions: npt.ArrayLike, drop_sizes: npt.ArrayLike, sample_indices: npt.ArrayLike
+    drop_positions: npt.ArrayLike,
+    drop_sizes: npt.ArrayLike,
+    sample_indices: npt.ArrayLike,
 ) -> npt.NDArray[np.float64]:
     """L(k): total samples lost at or before each sample index k (drops sorted or not)."""
     pos = np.asarray(drop_positions, dtype=float)
@@ -204,7 +212,11 @@ class TimingFit:
 
     def to_sync_time(self, sample_indices: npt.ArrayLike) -> npt.NDArray[np.float64]:
         k = np.asarray(sample_indices, dtype=float)
-        return self.start_time + (k + cumulative_loss(self.drop_positions, self.drop_sizes, k)) / self.sampling_rate
+        return (
+            self.start_time
+            + (k + cumulative_loss(self.drop_positions, self.drop_sizes, k))
+            / self.sampling_rate
+        )
 
 
 def pair_barcodes(
@@ -231,7 +243,12 @@ def pair_barcodes(
 
 def _running_median(x: npt.NDArray, half_width: int = 2) -> npt.NDArray:
     n = len(x)
-    return np.array([np.median(x[max(0, i - half_width): min(n, i + half_width + 1)]) for i in range(n)])
+    return np.array(
+        [
+            np.median(x[max(0, i - half_width) : min(n, i + half_width + 1)])
+            for i in range(n)
+        ]
+    )
 
 
 def reject_mispairs(
@@ -269,7 +286,9 @@ def _refine(
     new = sizes.astype(float).copy()
     if pos.size == 0:
         return new
-    k_of_drop = np.searchsorted(p, pos, side="left") - 1  # interval index: p[k] < pos <= p[k+1]
+    k_of_drop = (
+        np.searchsorted(p, pos, side="left") - 1
+    )  # interval index: p[k] < pos <= p[k+1]
     for k in np.unique(k_of_drop):
         if k < 0 or k >= len(p) - 1:
             continue
@@ -281,7 +300,12 @@ def _refine(
 
 
 def _fit_once(
-    s: npt.NDArray, p: npt.NDArray, fs: float, pos: npt.NDArray, sizes: npt.NDArray, refine: bool
+    s: npt.NDArray,
+    p: npt.NDArray,
+    fs: float,
+    pos: npt.NDArray,
+    sizes: npt.NDArray,
+    refine: bool,
 ) -> tuple[float, float, npt.NDArray, npt.NDArray]:
     """Affine fit on corrected positions, optional refinement, refit.
     Returns (c0, c1, refined sizes, residual s - model at p)."""
@@ -328,14 +352,16 @@ def fit_device_timing(
     sizes = np.asarray(drop_sizes, dtype=float).ravel()
     o = np.argsort(pos, kind="stable")
     pos, sizes = pos[o], sizes[o]
-    metrics: dict = dict(n_logged_drops=int(pos.size), logged_loss_ms=float(sizes.sum() / fs * 1e3))
+    metrics: dict = dict(
+        n_logged_drops=int(pos.size), logged_loss_ms=float(sizes.sum() / fs * 1e3)
+    )
 
     def fail(reason: str, **kw) -> TimingFit:
         metrics.update(kw)
         return TimingFit("fail", reason, np.nan, np.nan, pos, sizes, (), metrics)
 
     s, d = pair_barcodes(sync_times, sync_ids, device_barcode_samples, device_ids)
-    metrics["n_paired"] = int(len(s))
+    metrics["n_paired"] = len(s)
     if len(s) < min_barcodes:
         return fail(f"too few paired barcodes ({len(s)} < {min_barcodes})")
 
@@ -344,7 +370,9 @@ def fit_device_timing(
     n_rej = int((~keep).sum())
     metrics["n_rejected_pairs"] = n_rej
     if n_rej > max(2, max_rejected_fraction * len(s)):
-        return fail(f"inconsistent barcode pairing ({n_rej} of {len(s)} pairs rejected)")
+        return fail(
+            f"inconsistent barcode pairing ({n_rej} of {len(s)} pairs rejected)"
+        )
     s, p = s[keep], d[keep]
     if len(s) < min_barcodes:
         return fail(f"too few consistent barcodes ({len(s)} < {min_barcodes})")
@@ -405,7 +433,9 @@ def fit_device_timing(
         in_invalid |= (s >= a) & (s <= b)
     loo_valid = np.abs(loo[~in_invalid[1:-1]]) * 1e3
     metrics["loo_max_ms"] = float(loo_valid.max()) if loo_valid.size else float("nan")
-    metrics["loo_p99_ms"] = float(np.quantile(loo_valid, 0.99)) if loo_valid.size else float("nan")
+    metrics["loo_p99_ms"] = (
+        float(np.quantile(loo_valid, 0.99)) if loo_valid.size else float("nan")
+    )
     metrics["total_loss_ms"] = float(S_ref.sum() / fs * 1e3)
     rate = fs / c1
     start = c0
@@ -415,4 +445,6 @@ def fit_device_timing(
         status, reason = "fail", (
             f"leave-one-out residual {metrics['loo_max_ms']:.3g} ms > {max_residual_ms} ms"
         )
-    return TimingFit(status, reason, float(rate), float(start), P, S_ref, tuple(invalid), metrics)
+    return TimingFit(
+        status, reason, float(rate), float(start), P, S_ref, tuple(invalid), metrics
+    )
