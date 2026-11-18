@@ -16,7 +16,7 @@ concurrency:
       
 jobs:
   build-doc:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # wavpack-numcodecs ships libs for glibc <= 2.39 only
 
     steps:
       - uses: actions/checkout@v3
