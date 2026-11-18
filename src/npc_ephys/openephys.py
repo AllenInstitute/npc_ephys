@@ -382,7 +382,7 @@ def get_ephys_data(
         dat: npt.NDArray[np.int16]
         if device.continuous.protocol in ("", "file"):
             # local file we can memory-map
-            dat = np.memmap(
+            dat = np.memmap(  # type: ignore[call-overload]
                 device.continuous / "continuous.dat", dtype="int16", mode="r"
             )
         else:
@@ -1018,7 +1018,8 @@ def validate_recording_folder(
         try:
             info = next(
                 get_ephys_timing_on_pxi(
-                    recording_path, only_devices_including=device_name
+                    recording_path,  # type: ignore[arg-type]
+                    only_devices_including=device_name,
                 )
             )
         except StopIteration:
