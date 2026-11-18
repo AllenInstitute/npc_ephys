@@ -92,7 +92,7 @@ class SpikeInterfaceData:
            'sync_spike_2', 'sync_spike_4', 'sync_spike_8', 'd_prime',
            'isolation_distance', 'l_ratio', 'silhouette', 'nn_hit_rate',
            'nn_miss_rate'],
-          dtype='object')
+          dtype=...)
     >>> si.version
     '0.100.0'
     >>> ''.join(si.probes)

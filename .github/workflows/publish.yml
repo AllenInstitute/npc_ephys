@@ -6,7 +6,7 @@ name: Publish Python package
 on:
   push:
     branches: [ "main" ] 
-    paths: # pushing any files/folders marked ! will not trigger the workflow
+    paths: # pushing any files/folders marked ! will not trigger the workflow (exceptions can be added)
       - '**'
       - '!**.ipynb'
       - '!**.json'
@@ -17,11 +17,22 @@ on:
       - '!**.md'
       - '!**.yml'
       - '.github/workflows/publish.yml'
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**.ipynb'
+      - '**.json'
+      - '.vscode'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'notebooks/**'
+      - '**.md'
+      - '**.yml'
   workflow_dispatch:  # adds a 'Run Workflow' button for manual launching
 
-concurrency: # jobs currently running will be cancelled when this workflow starts
+concurrency: # jobs currently running on main will be cancelled when this workflow starts
   group: ${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
       
 jobs:
   test:
@@ -30,7 +41,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        python-version: ["3.9", "3.11"]
+        python-version: ["3.11"]
         os: [ubuntu-latest, macOS-latest, windows-latest]
     permissions: write-all
 
@@ -41,15 +52,13 @@ jobs:
         # use PAT, or push comes from `github-actions` bot, which can't trigger
         # other workflows   
     
-    - uses: pdm-project/setup-pdm@v4
+    - uses: astral-sh/setup-uv@v5.4.1
       with:
         python-version: ${{ matrix.python-version }}
-        update-python: true
-        cache: true # speeds-up setup by caching downloaded packages 
         
     - name: Install dependencies
       run: |
-        pdm install -G dev
+        uv sync
         
     - name: Configure aws credentials
       env:
@@ -67,10 +76,11 @@ jobs:
         CODE_OCEAN_DOMAIN: ${{ secrets.CODE_OCEAN_DOMAIN }}
       run: |
         mkdir .mypy_cache   
-        pdm run test
+        uv run task test
     
   publish:
     needs: test
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions: write-all
 
@@ -80,20 +90,16 @@ jobs:
         fetch-depth: 0    # get all commits (on default branch)
         fetch-tags: true  
 
-    - uses: pdm-project/setup-pdm@v4
+    - uses: astral-sh/setup-uv@v5.4.1
       with:
         python-version: '3.11'
-        cache: true # speeds-up setup by caching downloaded packages 
 
     - name: Publish with bump & tag
       # actions/checkout 
       run: |
-        pdm install -G dev
-        git config --global user.email "${{ github.actor }}@users.noreply.github.com"
-        git config --global user.name "${{ github.actor }}"
-        pdm publish
-        git push
-        git push --tags
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        uv run task release
       env:
         GITHUB_TOKEN: ${{ secrets.PAT }}
         # use PAT, or push comes from `github-actions` bot, which can't trigger

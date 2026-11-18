@@ -3,36 +3,43 @@ name: Build docs
 on:
   push:
     paths:
-      - "**.md"
-      - docs/**
-      - .github/workflows/docs.yml
-    tags:        
-      - '*'        
+      - '**.md'
+      - '.github/workflows/docs.yml'
+    tags:
+      - '*'
   release:
     types: [published]
   workflow_dispatch:
 
-
 concurrency:
-  group: ${{ '{{' }} github.ref {{ '}}' }}
-
-
+  group: ${{ github.ref }}
+      
 jobs:
   build-doc:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v3
-      - uses: pdm-project/setup-pdm@main
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: 3.x
-          cache: true
+          python-version: '3.11'
+      - name: Configure aws credentials
+        env:
+          AWS_IAM_ROLE: ${{ vars.AWS_IAM_ROLE }}
+          AWS_DEFAULT_REGION: ${{ vars.AWS_DEFAULT_REGION }}
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_IAM_ROLE }}
+          aws-region: ${{ vars.AWS_DEFAULT_REGION }}
       - name: Build pages
         run: |
-          pdm install -G docs
-          cd docs && pdm run mkdocs build
+          uv sync --group docs
+          uv run --directory docs mkdocs build
+        env:
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+          
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
-          github_token: ${{ '{{' }} secrets.GITHUB_TOKEN {{ '}}' }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./docs/site

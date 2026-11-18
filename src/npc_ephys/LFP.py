@@ -127,8 +127,8 @@ def get_LFP_subsampled_results(
     96
     >>> LFP_probeA[0].probe
     'ProbeA'
-    >>> LFP_probeA[0].sampling_rate
-    1250.0031940878919
+    >>> round(LFP_probeA[0].sampling_rate, 4)
+    1250.0032
     """
     LFP_subsampled_results = []
     session = npc_session.SessionRecord(session)

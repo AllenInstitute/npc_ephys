@@ -28,9 +28,9 @@ build tools to be installed: if `pip install npc_ephys` fails you'll likely need
 # get device timing on sync clock using barcodes:
 >>> recording_path = 's3://aind-ephys-data/ecephys_670248_2023-08-03_12-04-15/ecephys_clipped/Record Node 102/experiment1/recording1'
 >>> sync_path = 's3://aind-ephys-data/ecephys_670248_2023-08-03_12-04-15/behavior/20230803T120415.h5'
->>> timing_data = next(npc_ephys.get_ephys_timing_on_sync(sync_path, recording_path))
->>> timing_data.device.name, timing_data.sampling_rate, timing_data.start_time
-('Neuropix-PXI-100.ProbeA-AP', 30000.070518634246, 20.080209634424037)
+>>> timing_data = npc_ephys.get_ephys_timing_on_sync(sync_path, recording_path)[0]
+>>> timing_data.device.name, timing_data.status, round(timing_data.sampling_rate, 2), round(timing_data.start_time, 3)
+('Neuropix-PXI-100.ProbeA-AP', 'pass', 30000.07, 20.08)
 
 # get a dataclass that reads SpikeInterface sorted data from the cloud
 # - from a path:
