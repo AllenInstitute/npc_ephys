@@ -76,8 +76,8 @@ class SpikeInterfaceData:
 
     Provide a session ID or a root path:
     >>> si = SpikeInterfaceData('668759_20230711')
-    >>> si.root
-    S3Path('s3://codeocean-s3datasetsbucket-1u41qdg42ur9/83754308-0a91-4b54-af79-3c42f6bc831b')
+    >>> si.root.as_posix()
+    's3://codeocean-s3datasetsbucket-1u41qdg42ur9/83754308-0a91-4b54-af79-3c42f6bc831b'
 
     >>> si.template_metrics_dict('probeA')
     {'metric_names': ['exp_decay', 'half_width', 'num_negative_peaks', 'num_positive_peaks', 'peak_to_valley', 'peak_trough_ratio', 'recovery_slope', 'repolarization_slope', 'spread', 'velocity_above', 'velocity_below'], 'sparsity': None, 'peak_sign': 'neg', 'upsampling_factor': 10, 'metrics_kwargs': {'recovery_window_ms': 0.7, 'peak_relative_threshold': 0.2, 'peak_width_ms': 0.1, 'depth_direction': 'y', 'min_channels_for_velocity': 5, 'min_r2_velocity': 0.5, 'exp_peak_function': 'ptp',
@@ -230,7 +230,8 @@ class SpikeInterfaceData:
 
     @staticmethod
     def read_csv(path: upath.UPath) -> pd.DataFrame:
-        return pd.read_csv(path, index_col=0)
+        with path.open("rb") as f:
+            return pd.read_csv(f, index_col=0)
 
     def get_json(self, filename: str) -> dict:
         assert self.root is not None
@@ -342,7 +343,7 @@ class SpikeInterfaceData:
         return self.get_path(dir_path.name, probe)
 
     @functools.cache
-    def sorting_analyzer(self, probe: str) -> zarr.hierarchy.Group:
+    def sorting_analyzer(self, probe: str) -> zarr.Group:
         """Open the probe's Zarr ``SortingAnalyzer`` store."""
         if not self._analyzer_metadata(probe):
             raise ValueError(f"{probe} uses the legacy SpikeInterface organization")
@@ -353,7 +354,7 @@ class SpikeInterfaceData:
         except (KeyError, ValueError):
             return zarr.open(store, mode="r")
 
-    def _analyzer_extension(self, probe: str, extension: str) -> zarr.hierarchy.Group:
+    def _analyzer_extension(self, probe: str, extension: str) -> zarr.Group:
         return self.sorting_analyzer(probe)[f"extensions/{extension}"]
 
     def _analyzer_metrics_df(self, probe: str, extension: str) -> pd.DataFrame:
@@ -611,7 +612,7 @@ class SpikeInterfaceData:
         return next((self.root / "nwb").glob("*.nwb"))
 
     @npc_io.cached_property
-    def nwb_zarr(self) -> zarr.hierarchy.Group:
+    def nwb_zarr(self) -> zarr.Group:
         return zarr.open(
             self.nwb_path.fs.get_mapper(self.nwb_path.path),
             mode="r",

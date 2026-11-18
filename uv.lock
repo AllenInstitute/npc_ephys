@@ -2600,9 +2600,9 @@ testing = [
 [package.metadata]
 requires-dist = [
     { name = "hdmf-zarr-bjh", marker = "extra == 'nwb'", specifier = "==0.8.1.post1" },
-    { name = "npc-io", specifier = ">=0.1.26" },
+    { name = "npc-io", specifier = ">=0.1.34" },
     { name = "npc-lims", specifier = ">=0.1.73" },
-    { name = "npc-sync", specifier = ">=0.3.4" },
+    { name = "npc-sync", specifier = ">=0.3.5" },
     { name = "numcodecs", specifier = "<0.16" },
     { name = "pandas", specifier = ">=2.2.0" },
     { name = "polars", specifier = ">=0.20.26" },
@@ -2647,7 +2647,7 @@ testing = [
 
 [[package]]
 name = "npc-io"
-version = "0.1.32"
+version = "0.1.34"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "boto3" },
@@ -2657,9 +2657,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "universal-pathlib" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/13/f9/c51f770d0a34e88a85482e3063be57ed271ff584a21b233208579b6e6262/npc_io-0.1.32.tar.gz", hash = "sha256:3d4c269e9ab1beac6466ba6dcb1665adf912ac9b5d44677680fd23eb777c9177", size = 10934, upload-time = "2024-10-29T21:43:22.266Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/33/de/7c76edb48664dd9204bd3acf4082a059c2e5321e08cef9d41c9dfc3fea5a/npc_io-0.1.34.tar.gz", hash = "sha256:64da2ecf5f8e6810cc9c31562a3f2ed2df63eba56fc98278b58227417cbb8dd6", size = 11112, upload-time = "2026-11-18T21:32:59.302Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4a/3b/20ad8de8b9d2ba326fa4fe2c96532ff258c3adb87090827550531dcf8b26/npc_io-0.1.32-py3-none-any.whl", hash = "sha256:5d324e0c335c6885c71a70faee18433d2e14a6c4128f39006c0fdb78190c9e25", size = 10300, upload-time = "2024-10-29T21:43:20.927Z" },
+    { url = "https://files.pythonhosted.org/packages/92/39/2c0575763f729fe2763419c96bb3278c46ae8cbfcfe0235adb4ccebc2bb1/npc_io-0.1.34-py3-none-any.whl", hash = "sha256:f04de70ef359e7e26a500a7cd8722faefcc3d9091b229dbfeef8e5991b56d206", size = 10411, upload-time = "2026-11-18T21:32:58.479Z" },
 ]
 
 [[package]]
@@ -2699,7 +2699,7 @@ wheels = [
 
 [[package]]
 name = "npc-sync"
-version = "0.3.4"
+version = "0.3.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "h5py" },
@@ -2709,9 +2709,9 @@ dependencies = [
     { name = "numpy" },
     { name = "scipy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1a/0c/ac8dfc6c878330bc934f38d37ccd1dc4e2f5a840c9120446a0bb0f162ad8/npc_sync-0.3.4.tar.gz", hash = "sha256:99f1d4f393119005430d93f102aef393b5791e32ca0e67a6ada716d9c8f48dc2", size = 61231, upload-time = "2026-11-18T18:34:37.653Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a7/6b/b95218e2303b2356d78242e958074386d2129c28016aa5a3c2cffa8b2ed9/npc_sync-0.3.5.tar.gz", hash = "sha256:329f42ff00e6f981982db752417e5e5aba81305b5005da658fa23266b8349d99", size = 61253, upload-time = "2026-11-18T21:32:56.645Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f3/b2/d1965b8e38accd8f7283c072008ad1f2e4ee9917af85fce6c3a3464fa90b/npc_sync-0.3.4-py3-none-any.whl", hash = "sha256:e2f692412bb053aebdc848653f91979f610b750a616b5321f5045d047e39fd2e", size = 49590, upload-time = "2026-11-18T18:34:36.378Z" },
+    { url = "https://files.pythonhosted.org/packages/7e/d7/01ec3b1fa86ea365b0210421ff3af974f32570611b3ac12984f65822de5d/npc_sync-0.3.5-py3-none-any.whl", hash = "sha256:0f0345e5ad3bc11c1369067e0a77f96637417e947bf19be50bd00db779616996", size = 49636, upload-time = "2026-11-18T21:32:55.515Z" },
 ]
 
 [[package]]
@@ -2939,6 +2939,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/1f/e7/81fdcbc7f190cdb058cffc9431587eb289833bdd633e2002455ca9bb13d4/paramiko-4.0.0.tar.gz", hash = "sha256:6a25f07b380cc9c9a88d2b920ad37167ac4667f8d9886ccebd8f90f654b5d69f", size = 1630743, upload-time = "2025-08-04T01:02:03.711Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a9/90/a744336f5af32c433bd09af7854599682a383b37cfd78f7de263de6ad6cb/paramiko-4.0.0-py3-none-any.whl", hash = "sha256:0e20e00ac666503bf0b4eda3b6d833465a2b7aff2e2b3d79a8bba5ef144ee3b9", size = 223932, upload-time = "2025-08-04T01:02:02.029Z" },
+]
+
+[[package]]
+name = "pathlib-abc"
+version = "0.5.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d6/cb/448649d7f25d228bf0be3a04590ab7afa77f15e056f8fa976ed05ec9a78f/pathlib_abc-0.5.2.tar.gz", hash = "sha256:fcd56f147234645e2c59c7ae22808b34c364bb231f685ddd9f96885aed78a94c", size = 33342, upload-time = "2025-10-10T18:37:20.524Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b1/29/c028a0731e202035f0e2e0bfbf1a3e46ad6c628cbb17f6f1cc9eea5d9ff1/pathlib_abc-0.5.2-py3-none-any.whl", hash = "sha256:4c9d94cf1b23af417ce7c0417b43333b06a106c01000b286c99de230d95eefbb", size = 19070, upload-time = "2025-10-10T18:37:19.437Z" },
 ]
 
 [[package]]
@@ -4181,14 +4190,15 @@ wheels = [
 
 [[package]]
 name = "universal-pathlib"
-version = "0.1.4"
+version = "0.3.10"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fsspec" },
+    { name = "pathlib-abc" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0b/3a/569483e8790a1673f3dfbb51bdf02803707184f4a47c9ac834e5f943c56b/universal_pathlib-0.1.4.tar.gz", hash = "sha256:82e5d86d16a27e0ea1adc7d88acbcba9d02d5a45488163174f96d9ac289db2e4", size = 131349, upload-time = "2023-10-19T20:19:06.966Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3d/6e/d997a70ee8f4c61f9a7e2f4f8af721cf072a3326848fc881b05187e52558/universal_pathlib-0.3.10.tar.gz", hash = "sha256:4487cbc90730a48cfb64f811d99e14b6faed6d738420cd5f93f59f48e6930bfb", size = 261110, upload-time = "2026-02-22T14:40:58.87Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ed/6e/b726049020b66bf69b1b695b75a3d585e28f444b7259fab9be193de97b2c/universal_pathlib-0.1.4-py3-none-any.whl", hash = "sha256:f99186cf950bde1262de9a590bb019613ef84f9fabd9f276e8b019722201943a", size = 20558, upload-time = "2023-10-19T20:19:05.739Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/1a/5d9a402b39ec892d856bbdd9db502ff73ce28cdf4aff72eb1ce1d6843506/universal_pathlib-0.3.10-py3-none-any.whl", hash = "sha256:dfaf2fb35683d2eb1287a3ed7b215e4d6016aa6eaf339c607023d22f90821c66", size = 83528, upload-time = "2026-02-22T14:40:57.316Z" },
 ]
 
 [[package]]

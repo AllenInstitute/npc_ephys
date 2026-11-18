@@ -10,7 +10,6 @@ import numpy as np
 import numpy.typing as npt
 import upath
 import zarr
-import zarr.core
 
 import npc_ephys.openephys
 
@@ -24,7 +23,7 @@ class LFP:
     """Data class with LFP traces n samples x m channels, LFP aligned timestamps to sync size n timestamps,
     LFP channels selected size m channels output from LFP subsampling capsule"""
 
-    traces: zarr.core.Array  # samples x channels
+    traces: zarr.Array  # samples x channels
     timestamps: npt.NDArray[np.float64]
     channel_ids: tuple[int, ...]  # 0 indexed, output from spike interface is 1 indexed
     probe: str
@@ -43,7 +42,7 @@ class LFP:
             )
 
 
-def _get_LFP_channel_ids(LFP_channels: zarr.core.Array | list[str]) -> tuple[int, ...]:
+def _get_LFP_channel_ids(LFP_channels: zarr.Array | list[str]) -> tuple[int, ...]:
     """
     >>> ids = ['LFP1', 'LFP4', 'LFP380']
     >>> _get_LFP_channel_ids(ids)
@@ -82,7 +81,7 @@ def _get_LFP_probe_result(
         return None
 
     probe_LFP_zarr_file = probe_LFP_subsampled_file[0]
-    probe_LFP_zarr = zarr.open(probe_LFP_zarr_file, mode="r")
+    probe_LFP_zarr = npc_ephys.openephys.open_zarr(probe_LFP_zarr_file)
     probe_LFP_traces, probe_LFP_channels = (
         probe_LFP_zarr["traces_seg0"],
         probe_LFP_zarr["channel_ids"],

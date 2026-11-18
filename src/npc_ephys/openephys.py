@@ -303,8 +303,8 @@ def get_ephys_timing_on_pxi(
 def clipped_path_to_compressed(path: npc_io.PathLike) -> upath.UPath:
     """
     >>> path = upath.UPath('s3://aind-ephys-data/ecephys_670248_2023-08-03_12-04-15/ecephys_clipped/Record Node 102/experiment1/recording1/continuous/Neuropix-PXI-100.ProbeA-AP')
-    >>> clipped_path_to_compressed(path)
-    S3Path('s3://aind-ephys-data/ecephys_670248_2023-08-03_12-04-15/ecephys_compressed/experiment1_Record Node 102#Neuropix-PXI-100.ProbeA-AP.zarr')
+    >>> clipped_path_to_compressed(path).as_posix()
+    's3://aind-ephys-data/ecephys_670248_2023-08-03_12-04-15/ecephys_compressed/experiment1_Record Node 102#Neuropix-PXI-100.ProbeA-AP.zarr'
     """
     path = npc_io.from_pathlike(path)
     if "ecephys_clipped" not in path.as_posix():
@@ -337,6 +337,17 @@ def clipped_path_to_compressed(path: npc_io.PathLike) -> upath.UPath:
     return compressed_path
 
 
+def open_zarr(path: npc_io.PathLike, mode: Literal["r"] = "r") -> zarr.Group:
+    """Open a zarr store at a local or cloud path.
+
+    zarr doesn't accept `UPath` objects directly (zarr 3, and zarr 2 with
+    universal-pathlib>=0.2, where `UPath` is no longer `os.PathLike`), so we pass an
+    fsspec mapper, which works with zarr 2 and 3, and preserves storage options.
+    """
+    path = npc_io.from_pathlike(path)
+    return zarr.open(path.fs.get_mapper(path.path), mode=mode)
+
+
 def get_ephys_data(
     *recording_dirs: npc_io.PathLike,
     device: str | EphysDeviceInfo,
@@ -346,7 +357,7 @@ def get_ephys_data(
             get_ephys_timing_on_pxi(recording_dirs, only_devices_including=device)
         ).device
     if device.compressed:
-        data = zarr.open(device.compressed, mode="r")
+        data = open_zarr(device.compressed)
         return data["traces_seg0"]
     else:
         device_metadata = next(
