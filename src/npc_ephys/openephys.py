@@ -18,6 +18,7 @@ import upath
 import zarr
 
 import npc_ephys.barcodes
+import npc_ephys.sample_drops
 import npc_ephys.settings_xml
 
 logger = logging.getLogger(__name__)
@@ -142,17 +143,63 @@ class EphysTimingInfoOnPXI:
 
 @dataclasses.dataclass(frozen=True, eq=True, unsafe_hash=True)
 class EphysTimingInfoOnSync:
+    """Timing of one Open Ephys device on the sync clock.
+
+    Sync time of recorded sample index k (0 = first recorded sample):
+
+        t(k) = start_time + (k + L(k)) / sampling_rate
+
+    where L(k) is the number of samples lost (dropped by the acquisition system) at or before k,
+    from `drops`. Without drops this is the usual affine map. Use `to_sync_time` rather than
+    `start_time` and `sampling_rate` directly.
+
+    Devices that fail QC have `status == 'fail'`, a `reason`, and nan `sampling_rate` and
+    `start_time`.
+    """
+
     device: EphysDeviceInfo
     """Info with paths"""
     sampling_rate: float
     """Sample rate assessed on the sync clock"""
     start_time: float
     """First sample time (sec) relative to the start of the sync clock"""
+    drops: tuple[tuple[float, float], ...] = ()
+    """(sample index of the first sample after a gap, number of samples lost), sorted"""
+    invalid_intervals: tuple[tuple[float, float], ...] = ()
+    """Sync-time intervals (sec) containing a loss of unknown position (timing inside them is
+    uncertain by up to the loss)"""
+    status: Literal["pass", "fail"] = "pass"
+    reason: str = ""
+    qc: tuple[tuple[str, Any], ...] = ()
+    """QC metrics as (name, value) pairs - see `qc_metrics`"""
+
+    @property
+    def is_valid(self) -> bool:
+        return self.status == "pass"
+
+    @property
+    def qc_metrics(self) -> dict[str, Any]:
+        return dict(self.qc)
+
+    @property
+    def total_samples_lost(self) -> float:
+        return float(sum(n for _, n in self.drops))
+
+    def to_sync_time(self, sample_indices: npt.ArrayLike) -> npt.NDArray[np.float64]:
+        """Sync time (sec) of recorded sample indices (relative to the first recorded sample;
+        fractional indices allowed)."""
+        k = np.asarray(sample_indices, dtype=float)
+        if not self.drops:
+            return self.start_time + k / self.sampling_rate
+        pos, n = (np.array(v, dtype=float) for v in zip(*self.drops))
+        return self.start_time + (
+            k + npc_ephys.sample_drops.cumulative_loss(pos, n, k)
+        ) / self.sampling_rate
 
     @property
     def stop_time(self) -> float:
         """Last sample time (sec) relative to the start of the sync clock"""
-        return self.start_time + (self.device.num_samples / self.sampling_rate)
+        return float(self.to_sync_time(self.device.num_samples))
 
 
 def read_array_range_from_npy(
@@ -398,12 +445,111 @@ def get_pxi_nidaq_info(
     return info[0]
 
 
+SYNC_INVALID_INTERVAL_PADDING_S = 2.0
+"""Barcode edges this close to a sync invalid interval (replayed buffers) are not used."""
+
+
+def _sync_barcodes(sync: npc_sync.SyncDataset) -> tuple[npt.NDArray, npt.NDArray]:
+    on = sync.get_rising_edges("barcode_ephys", units="seconds")
+    off = sync.get_falling_edges("barcode_ephys", units="seconds")
+    invalid = tuple(getattr(sync, "invalid_intervals", ()) or ())
+    if invalid:
+        pad = SYNC_INVALID_INTERVAL_PADDING_S
+        bad = [(a - pad, b + pad) for a, b in invalid]
+
+        def inside(t):
+            m = np.zeros(len(t), bool)
+            for a, b in bad:
+                m |= (t >= a) & (t < b)
+            return m
+
+        on, off = on[~inside(on)], off[~inside(off)]
+    return npc_ephys.barcodes.extract_barcodes_from_times(
+        on_times=on, off_times=off, total_time_on_line=sync.total_seconds
+    )
+
+
+def _device_barcodes(info: EphysTimingInfoOnPXI) -> tuple[npt.NDArray, npt.NDArray]:
+    """Barcode start times in samples (relative to first recorded sample) and values."""
+    fs = info.sampling_rate
+    d = info.device
+    t, ids = npc_ephys.barcodes.extract_barcodes_from_times(
+        on_times=d.ttl_sample_numbers[d.ttl_states == BARCODE_TTL_CHANNEL] / fs,
+        off_times=d.ttl_sample_numbers[d.ttl_states == -BARCODE_TTL_CHANNEL] / fs,
+        total_time_on_line=(
+            d.ttl_sample_numbers[-1] / fs if len(d.ttl_sample_numbers) > 0 else 0.0
+        ),
+    )
+    return np.asarray(t, dtype=float) * fs, np.asarray(ids)
+
+
+_DROP_MESSAGE_CACHE: dict[str, npt.NDArray[np.int64]] = {}
+
+
+def _drop_messages(recording_dir: upath.UPath) -> npt.NDArray[np.int64]:
+    key = recording_dir.as_posix()
+    if key not in _DROP_MESSAGE_CACHE:
+        _DROP_MESSAGE_CACHE[key] = npc_ephys.sample_drops.read_drop_messages(
+            recording_dir
+        )
+    return _DROP_MESSAGE_CACHE[key]
+
+
+def _ap_to_lfp_ratio(lfp_info: EphysTimingInfoOnPXI) -> float:
+    rates = get_sync_messages_data(
+        lfp_info.device.continuous.parent.parent / "sync_messages.txt"
+    )
+    ap = lfp_info.device.name.replace("-LFP", "-AP")
+    ap_rate = rates[ap]["rate"] if ap in rates else 30_000
+    return float(ap_rate) / lfp_info.sampling_rate
+
+
+def get_logged_drops(
+    info: EphysTimingInfoOnPXI,
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], str]:
+    """Logged drops for a Neuropixels device, in the device's own samples relative to its first
+    recorded sample: (positions, sizes, note). Empty for NI-DAQ devices and recordings without
+    drop messages. Timestamp-reset messages (not data loss) are excluded.
+
+    LFP positions/sizes are derived from the AP sample numbers in the log: the LFP sample number
+    is the AP sample number / (AP rate / LFP rate) (12 for NP1.0).
+    """
+    empty = np.zeros(0), np.zeros(0)
+    m = re.search(r"\.(Probe[A-Z])-(AP|LFP)$", info.device.name)
+    if m is None:
+        return *empty, ""
+    recording_dir = info.device.continuous.parent.parent
+    msgs = _drop_messages(recording_dir)
+    if msgs.size == 0:
+        return *empty, ""
+    xml = npc_ephys.sample_drops._settings_xml_for_recording(recording_dir)
+    slot_port = (
+        npc_ephys.sample_drops.get_probe_slot_port(xml, m.group(1)) if xml else None
+    )
+    if slot_port is None:
+        raise LookupError(
+            f"drop messages found in {recording_dir} but slot/port of {m.group(1)} is unknown"
+        )
+    sel = (msgs[:, 0] == slot_port[0]) & (msgs[:, 1] == slot_port[1])
+    N, J = msgs[sel, 2], msgs[sel, 3]
+    reset = npc_ephys.sample_drops.is_timestamp_reset(N, J)
+    N, J = N[~reset], J[~reset]
+    sizes = npc_ephys.sample_drops.ticks_to_lost_samples(J)
+    note = f"slot {slot_port[0]} port {slot_port[1]}: {len(N)} logged drops, {int(reset.sum())} timestamp resets ignored"
+    if m.group(2) == "AP":
+        return (N - info.start_sample).astype(float), sizes, note
+    ratio = _ap_to_lfp_ratio(info)
+    return N / ratio - info.start_sample, sizes / ratio, note
+
+
 def get_ephys_timing_on_sync(
     sync: npc_sync.SyncPathOrDataset,
     recording_dirs: Iterable[npc_io.PathLike] | None = None,
     devices: Iterable[EphysTimingInfoOnPXI] | None = None,
     only_devices_including: str | None = None,
-) -> Generator[EphysTimingInfoOnSync, None, None]:
+    max_residual_ms: dict[str, float] | None = None,
+    step_threshold_ms: dict[str, float] | None = None,
+) -> tuple[EphysTimingInfoOnSync, ...]:
     """
     One of `recording_dir` or `devices` must be supplied:
         - all devices in `recording_dir` will be returned
@@ -411,73 +557,145 @@ def get_ephys_timing_on_sync(
         (use `get_ephys_timing_on_pxi()` to get a filtered iterable of devices
         in a recording_dir)
 
+    Every device is returned, each with its own `status` ('pass'/'fail') and `reason`. Failed
+    devices have nan `sampling_rate`/`start_time`: callers should exclude them (per device).
+
+    Timing model (see `npc_ephys.sample_drops`): sync time = start + (k + L(k)) / rate, fitted to
+    all barcodes whose value is unique on both lines, with samples lost by the acquisition system
+    (logged in the MessageCenter, refined against barcodes) added back. On a probe's LFP stream
+    the refined drop table from its AP stream is reused.
+
     >>> path = upath.UPath('s3://aind-ephys-data/ecephys_670248_2023-08-03_12-04-15/ecephys_clipped/Record Node 102/experiment1/recording1')
     >>> sync = upath.UPath('s3://aind-ephys-data/ecephys_670248_2023-08-03_12-04-15/behavior/20230803T120415.h5')
-    >>> timing_info = next(get_ephys_timing_on_sync(sync, path))
-    >>> timing_info.device.name, timing_info.sampling_rate, timing_info.start_time
-    ('Neuropix-PXI-100.ProbeA-AP', 30000.070472670912, 20.080209602072898)
+    >>> timing_info = get_ephys_timing_on_sync(sync, path)[0]
+    >>> timing_info.device.name, timing_info.status, round(timing_info.sampling_rate), round(timing_info.start_time, 2)
+    ('Neuropix-PXI-100.ProbeA-AP', 'pass', 30000, 20.08)
     """
     if not (recording_dirs or devices):
         raise ValueError("Must specify recording_dir or devices")
+    thresholds = {
+        **npc_ephys.sample_drops.DEFAULT_MAX_RESIDUAL_MS,
+        **(max_residual_ms or {}),
+    }
+    step_thresholds = {
+        **npc_ephys.sample_drops.DEFAULT_STEP_THRESHOLD_MS,
+        **(step_threshold_ms or {}),
+    }
 
     sync = npc_sync.get_sync_data(sync)
+    sync_barcode_times, sync_barcode_ids = _sync_barcodes(sync)
 
-    sync_barcode_times, sync_barcode_ids = (
-        npc_ephys.barcodes.extract_barcodes_from_times(
-            on_times=sync.get_rising_edges("barcode_ephys", units="seconds"),
-            off_times=sync.get_falling_edges("barcode_ephys", units="seconds"),
-            total_time_on_line=sync.total_seconds,
-        )
-    )
     if devices and not isinstance(devices, Iterable):
         devices = (devices,)
-
     if recording_dirs and (
         isinstance(recording_dirs, str) or not isinstance(recording_dirs, Iterable)
     ):
         recording_dirs = (recording_dirs,)
-
     if recording_dirs and not devices:
         devices = get_ephys_timing_on_pxi(recording_dirs, only_devices_including)
-
     assert devices is not None
-    for info in devices:
-        (
-            ephys_barcode_times,
-            ephys_barcode_ids,
-        ) = npc_ephys.barcodes.extract_barcodes_from_times(
-            on_times=info.device.ttl_sample_numbers[
-                info.device.ttl_states == BARCODE_TTL_CHANNEL
-            ]
-            / info.sampling_rate,
-            off_times=info.device.ttl_sample_numbers[
-                info.device.ttl_states == -BARCODE_TTL_CHANNEL
-            ]
-            / info.sampling_rate,
-            total_time_on_line=(
-                info.device.ttl_sample_numbers[-1] / info.sampling_rate
-                if len(info.device.ttl_sample_numbers) > 0
-                else 0.0
-            ),
-        )
+    infos = tuple(devices)
 
-        timeshift, sampling_rate, _ = npc_ephys.barcodes.get_probe_time_offset(
-            master_times=sync_barcode_times,
-            master_barcodes=sync_barcode_ids,
-            probe_times=ephys_barcode_times,
-            probe_barcodes=ephys_barcode_ids,
-            acq_start_index=0,
-            local_probe_rate=info.sampling_rate,
+    stream_type = npc_ephys.sample_drops.stream_type
+    results: dict[int, EphysTimingInfoOnSync] = {}
+    ap_fits: dict[
+        str, tuple[EphysTimingInfoOnPXI, npc_ephys.sample_drops.TimingFit]
+    ] = {}
+    # AP streams first, so each LFP stream can reuse its probe's refined AP drop table
+    order = sorted(
+        range(len(infos)),
+        key=lambda i: {"AP": 0, "LFP": 1}.get(stream_type(infos[i].device.name), 2),
+    )
+    for i in order:
+        info = infos[i]
+        name = info.device.name
+        kind = stream_type(name)
+        try:
+            pos, sizes, note = get_logged_drops(info)
+        except LookupError as exc:
+            results[i] = EphysTimingInfoOnSync(
+                device=info.device,
+                sampling_rate=np.nan,
+                start_time=np.nan,
+                status="fail",
+                reason=str(exc),
+            )
+            continue
+        refine = True
+        inherited: tuple[tuple[float, float], ...] = ()
+        ap_name = name.replace("-LFP", "-AP")
+        if (
+            kind == "LFP"
+            and ap_name in ap_fits
+            and ap_fits[ap_name][1].status != "pass"
+            and not ap_fits[ap_name][1].reason.startswith("too few")
+        ):
+            # same probe, same clock, same lost samples: an unexplained AP failure applies
+            # to the LFP stream too (AP barcodes are 12x more precise)
+            results[i] = EphysTimingInfoOnSync(
+                device=info.device,
+                sampling_rate=np.nan,
+                start_time=np.nan,
+                status="fail",
+                reason=f"{ap_name} failed timing QC: {ap_fits[ap_name][1].reason}",
+            )
+            continue
+        if (
+            kind == "LFP"
+            and ap_name in ap_fits
+            and ap_fits[ap_name][1].status == "pass"
+        ):
+            ap_info, ap_fit = ap_fits[ap_name]
+            ratio = _ap_to_lfp_ratio(info)
+            pos = (ap_fit.drop_positions + ap_info.start_sample) / ratio - info.start_sample
+            sizes = ap_fit.drop_sizes / ratio
+            refine = False
+            inherited = ap_fit.invalid_intervals
+            note += f"; drop table from {ap_name}"
+        dev_samples, dev_ids = _device_barcodes(info)
+        fit = npc_ephys.sample_drops.fit_device_timing(
+            sync_barcode_times,
+            sync_barcode_ids,
+            dev_samples,
+            dev_ids,
+            info.sampling_rate,
+            pos,
+            sizes,
+            refine=refine,
+            max_residual_ms=thresholds[kind],
+            step_threshold_ms=step_thresholds[kind],
         )
-        start_time = -timeshift
-        if (np.isnan(sampling_rate)) | (~np.isfinite(sampling_rate)):
-            sampling_rate = info.sampling_rate
-
-        yield EphysTimingInfoOnSync(
+        if kind == "AP":
+            ap_fits[name] = (info, fit)
+        metrics = dict(fit.metrics, note=note)
+        if fit.status != "pass":
+            logger.warning(f"{name}: timing QC failed: {fit.reason}")
+            results[i] = EphysTimingInfoOnSync(
+                device=info.device,
+                sampling_rate=np.nan,
+                start_time=np.nan,
+                status="fail",
+                reason=fit.reason,
+                qc=tuple(metrics.items()),
+            )
+            continue
+        drops = tuple(
+            (float(p), float(n))
+            for p, n in zip(fit.drop_positions, fit.drop_sizes)
+            if n != 0
+        )
+        invalid = tuple(sorted(set(fit.invalid_intervals) | set(inherited)))
+        results[i] = EphysTimingInfoOnSync(
             device=info.device,
-            sampling_rate=float(sampling_rate),
-            start_time=float(start_time),
+            sampling_rate=fit.sampling_rate,
+            start_time=fit.start_time,
+            drops=drops,
+            invalid_intervals=invalid,
+            status="pass",
+            reason="",
+            qc=tuple(metrics.items()),
         )
+    return tuple(results[i] for i in range(len(infos)))
 
 
 def is_new_ephys_folder(path: npc_io.PathLike) -> bool:
@@ -845,26 +1063,24 @@ def get_adjusted_timestamps(
 
     >>> sync = upath.UPath('s3://aind-ephys-data/ecephys_670248_2023-08-03_12-04-15/behavior/20230803T120415.h5')
     >>> path = upath.UPath('s3://aind-ephys-data/ecephys_670248_2023-08-03_12-04-15/ecephys_clipped/Record Node 102/experiment1/recording1')
-    >>> ephys_timing = next(get_ephys_timing_on_sync(sync, path))
+    >>> ephys_timing = get_ephys_timing_on_sync(sync, path)[0]
     >>> t = get_adjusted_timestamps(ephys_timing)
-    >>> t.continuous
-    array([  20.0802096 ,   20.08024294,   20.08027627, ..., 4776.21733701,
-           4776.21737035, 4776.21740368])
-    >>> t.events
-    array([  41.19566   ,   41.21569329,   41.26469317, ..., 4779.77399532,
-           4779.83199519, 4779.86106179])
+    >>> t.continuous[[0, -1]].round(3)   # within 0.05 ms of the old first/last-barcode map
+    array([  20.08 , 4776.217])
+    >>> t.events[[0, -1]].round(3)
+    array([  41.196, 4779.861])
     """
+    if not getattr(ephys_timing, "is_valid", True):
+        raise ValueError(
+            f"{ephys_timing.device.name} failed timing QC: {ephys_timing.reason}"
+        )
     default_continuous = np.arange(
         start=0,
         stop=ephys_timing.device.num_samples,
         dtype=np.float64,
     )
-    adjusted_continuous = (
-        default_continuous / ephys_timing.sampling_rate
-    ) + ephys_timing.start_time
-    adjusted_events = (
-        ephys_timing.device.ttl_sample_numbers / ephys_timing.sampling_rate
-    ) + ephys_timing.start_time
+    adjusted_continuous = ephys_timing.to_sync_time(default_continuous)
+    adjusted_events = ephys_timing.to_sync_time(ephys_timing.device.ttl_sample_numbers)
     return SyncAdjustedTimestamps(
         timing=ephys_timing,
         continuous=adjusted_continuous,

@@ -88,10 +88,16 @@ def _get_LFP_probe_result(
         probe_LFP_zarr["channel_ids"],
     )
 
-    probe_LFP_aligned_timestamps = (
-        np.arange(probe_LFP_traces.shape[0])
-        / (device_timing.sampling_rate / temporal_factor)
-    ) + device_timing.start_time
+    if hasattr(device_timing, "to_sync_time"):
+        # subsampled index i corresponds to LFP sample i * temporal_factor
+        probe_LFP_aligned_timestamps = device_timing.to_sync_time(
+            np.arange(probe_LFP_traces.shape[0]) * temporal_factor
+        )
+    else:
+        probe_LFP_aligned_timestamps = (
+            np.arange(probe_LFP_traces.shape[0])
+            / (device_timing.sampling_rate / temporal_factor)
+        ) + device_timing.start_time
 
     probe_LFP_channel_ids = _get_LFP_channel_ids(probe_LFP_channels)
 

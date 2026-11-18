@@ -37,6 +37,16 @@ def get_aligned_spike_times(
     spike_times: npt.NDArray[np.floating],
     device_timing_on_sync: npc_ephys.openephys.EphysTimingInfo,
 ) -> npt.NDArray[np.float64]:
+    """`spike_times` in samples (relative to the first recorded sample) -> sync time (s).
+
+    Uses the device's drop-corrected map when available (`to_sync_time`).
+    """
+    if not getattr(device_timing_on_sync, "is_valid", True):
+        raise ValueError(
+            f"{device_timing_on_sync.device.name} failed timing QC: {device_timing_on_sync.reason}"
+        )
+    if hasattr(device_timing_on_sync, "to_sync_time"):
+        return device_timing_on_sync.to_sync_time(spike_times)
     return (
         spike_times / device_timing_on_sync.sampling_rate
     ) + device_timing_on_sync.start_time
@@ -277,6 +287,12 @@ def make_units_table_from_spike_interface(
     devices_timing = tuple(
         timing for timing in device_timing_on_sync if _is_ap_device_timing(timing)
     )
+    for timing in devices_timing:
+        if not getattr(timing, "is_valid", True):
+            logger.warning(
+                f"Excluding {timing.device.name} from units: timing QC failed ({timing.reason})"
+            )
+    devices_timing = tuple(t for t in devices_timing if getattr(t, "is_valid", True))
 
     task_to_future: dict[tuple[str, str], concurrent.futures.Future[pd.DataFrame]] = {}
     with concurrent.futures.ThreadPoolExecutor() as executor:
