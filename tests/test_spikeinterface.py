@@ -361,3 +361,44 @@ def test_s3_result_path_is_not_parsed_as_session_id() -> None:
 
     assert data.session is None
     assert str(data.root) == path
+
+
+def test_sorting_names_for_device_filters_by_recording(tmp_path: Path) -> None:
+    root = tmp_path / "multi-recording"
+    postprocessed = root / "postprocessed"
+    postprocessed.mkdir(parents=True)
+    sorting_names = tuple(
+        f"experiment1_Record Node 103#Neuropix-PXI-100.ProbeA-AP_recording{n}"
+        for n in (1, 2, 12)
+    )
+    for sorting_name in sorting_names:
+        (postprocessed / sorting_name).mkdir()
+
+    data = SpikeInterfaceData(root=root)
+    device = "Neuropix-PXI-100.ProbeA-AP"
+    assert sorted(data.sorting_names_for_device(device)) == sorted(sorting_names)
+    for name in sorting_names:
+        recording = name.rsplit("_", 1)[-1]
+        recording_dir = root / "Record Node 103" / "experiment1" / recording
+        assert data.sorting_names_for_device(device, recording_dir) == (name,)
+    other_experiment = root / "Record Node 103" / "experiment2" / "recording1"
+    assert data.sorting_names_for_device(device, other_experiment) == ()
+
+
+def test_nwb_path_for_sorting_matches_recording(tmp_path: Path) -> None:
+    root = tmp_path / "nextflow"
+    (root / "nwb").mkdir(parents=True)
+    (root / "output").write_text("N E X T F L O W")
+    nwbs = tuple(
+        root / "nwb" / f"ecephys_712141_2024-06-11_11-50-06_experiment1_recording{n}.nwb"
+        for n in (1, 2)
+    )
+    for nwb in nwbs:
+        nwb.mkdir()
+
+    data = SpikeInterfaceData(root=root)
+    for n, nwb in zip((1, 2), nwbs):
+        sorting_name = (
+            f"experiment1_Record Node 103#Neuropix-PXI-100.ProbeA-AP_recording{n}"
+        )
+        assert data.nwb_path_for_sorting(sorting_name).name == nwb.name

@@ -12,6 +12,7 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import tqdm
+import upath
 
 import npc_ephys.openephys
 import npc_ephys.spikeinterface
@@ -262,6 +263,16 @@ def _is_ap_device_timing(
     return name.endswith("-AP") or timing.sampling_rate >= 10_000
 
 
+def _recording_dir(
+    timing: npc_ephys.openephys.EphysTimingInfo,
+) -> upath.UPath | None:
+    """`.../Record Node N/experimentN/recordingN` dir of the device, if known."""
+    continuous = getattr(timing.device, "continuous", None)
+    if continuous is None:
+        return None
+    return npc_io.from_pathlike(continuous).parent.parent
+
+
 def make_units_table_from_spike_interface(
     session_or_spikeinterface_data_or_path: (
         str
@@ -297,8 +308,10 @@ def make_units_table_from_spike_interface(
     task_to_future: dict[tuple[str, str], concurrent.futures.Future[pd.DataFrame]] = {}
     with concurrent.futures.ThreadPoolExecutor() as executor:
         for device_timing in devices_timing:
+            # sortings of other experiments/recordings don't share this device's timing
             sorting_names = spike_interface_data.sorting_names_for_device(
-                device_timing.device.name
+                device_timing.device.name,
+                recording_dir=_recording_dir(device_timing),
             )
             if not sorting_names:
                 sorting_names = (

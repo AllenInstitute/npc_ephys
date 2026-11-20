@@ -8,6 +8,7 @@ import functools
 import io
 import json
 import logging
+import re
 from typing import Any, Literal, TypeAlias, Union, cast
 
 import aind_session
@@ -32,6 +33,39 @@ SpikeInterfaceDataSource: TypeAlias = Union[
 
 class ProbeNotFoundError(FileNotFoundError):
     pass
+
+
+_EXPERIMENT_PATTERN = re.compile(r"(?:^|[_/\\])experiment(\d+)(?=[_/\\.]|$)")
+_RECORDING_PATTERN = re.compile(r"(?:^|[_/\\])recording(\d+)(?=[_/\\.]|$)")
+
+
+def get_experiment_recording(name: str) -> tuple[int | None, int | None]:
+    """Parse Open Ephys experiment and recording numbers from a sorting name, NWB
+    filename or raw-data path. Missing components are returned as None.
+
+    >>> get_experiment_recording('experiment1_Record Node 103#Neuropix-PXI-100.ProbeA-AP_recording2')
+    (1, 2)
+    >>> get_experiment_recording('ecephys_712141_2024-06-11_11-50-06_experiment1_recording12.nwb')
+    (1, 12)
+    >>> get_experiment_recording('s3://bucket/ecephys_clipped/Record Node 103/experiment2/recording1')
+    (2, 1)
+    >>> get_experiment_recording('ProbeA')
+    (None, None)
+    """
+    experiment = _EXPERIMENT_PATTERN.search(name)
+    recording = _RECORDING_PATTERN.search(name)
+    return (
+        int(experiment.group(1)) if experiment else None,
+        int(recording.group(1)) if recording else None,
+    )
+
+
+def _is_same_experiment_recording(a: str, b: str) -> bool:
+    """False only if both names specify an experiment or recording and they differ."""
+    return all(
+        x is None or y is None or x == y
+        for x, y in zip(get_experiment_recording(a), get_experiment_recording(b))
+    )
 
 
 def get_spikeinterface_data(
@@ -293,11 +327,28 @@ class SpikeInterfaceData:
             if "sorting" not in path.name
         )
 
-    def sorting_names_for_device(self, device_name: str) -> tuple[str, ...]:
-        """Return sorting outputs associated with an Open Ephys device name."""
+    def sorting_names_for_device(
+        self,
+        device_name: str,
+        recording_dir: npc_io.PathLike | None = None,
+    ) -> tuple[str, ...]:
+        """Return sorting outputs associated with an Open Ephys device name.
+
+        If `recording_dir` (e.g. `.../Record Node 103/experiment1/recording1`) is
+        provided, sortings of other experiments/recordings of the same device are
+        excluded: they don't share the device's timing info.
+        """
+        sorting_names = self.sorting_names
+        if recording_dir is not None:
+            recording_dir = npc_io.from_pathlike(recording_dir).as_posix()
+            sorting_names = tuple(
+                sorting_name
+                for sorting_name in sorting_names
+                if _is_same_experiment_recording(sorting_name, recording_dir)
+            )
         exact_matches = tuple(
             sorting_name
-            for sorting_name in self.sorting_names
+            for sorting_name in sorting_names
             if device_name.casefold() in sorting_name.casefold()
         )
         if exact_matches:
@@ -306,7 +357,7 @@ class SpikeInterfaceData:
         probe = npc_session.ProbeRecord(device_name)
         return tuple(
             sorting_name
-            for sorting_name in self.sorting_names
+            for sorting_name in sorting_names
             if npc_session.ProbeRecord(sorting_name) == probe
         )
 
@@ -555,18 +606,18 @@ class SpikeInterfaceData:
     def device_indices_in_nwb_units(
         self, probe: str | npc_session.ProbeRecord
     ) -> npt.NDArray:
-        probe = npc_session.ProbeRecord(probe)
         devices = np.array(
             [
                 npc_session.ProbeRecord(device)
-                for device in self.nwb_zarr["units/device_name"][:]
+                for device in self.nwb_zarr_for_sorting(str(probe))[
+                    "units/device_name"
+                ][:]
             ]
         )
-
-        return np.argwhere(devices == probe).squeeze()
+        return np.argwhere(devices == npc_session.ProbeRecord(probe)).squeeze()
 
     def get_nwb_units_device_property(self, metric: str, probe: str) -> npt.NDArray:
-        return self.nwb_zarr[f"units/{metric}"][
+        return self.nwb_zarr_for_sorting(probe)[f"units/{metric}"][
             self.device_indices_in_nwb_units(probe)
         ].squeeze()
 
@@ -603,19 +654,52 @@ class SpikeInterfaceData:
         )
 
     @npc_io.cached_property
-    def nwb_path(self) -> upath.UPath:
+    def nwb_paths(self) -> tuple[upath.UPath, ...]:
+        """All NWB files output by the pipeline (one per experiment/recording)."""
         if not self.is_nextflow_pipeline:
             raise ValueError("NWB not part of output from stand alone capsule")
 
         assert self.root is not None
-        return next((self.root / "nwb").glob("*.nwb"))
+        paths = tuple(sorted((self.root / "nwb").glob("*.nwb")))
+        if not paths:
+            raise FileNotFoundError(f"No NWB files found in {self.root / 'nwb'}")
+        return paths
+
+    @npc_io.cached_property
+    def nwb_path(self) -> upath.UPath:
+        """First NWB file - use `nwb_path_for_sorting` when there may be
+        multiple experiments/recordings."""
+        return self.nwb_paths[0]
+
+    @functools.cache
+    def nwb_path_for_sorting(self, probe: str) -> upath.UPath:
+        """NWB file with the same experiment/recording as the sorting name."""
+        if len(self.nwb_paths) == 1:
+            return self.nwb_paths[0]
+        sorting_er = get_experiment_recording(probe)
+        matches = tuple(
+            path
+            for path in self.nwb_paths
+            if _is_same_experiment_recording(path.name, probe)
+        )
+        if len(matches) == 1:
+            return matches[0]
+        raise ValueError(
+            f"Could not identify a single NWB file for {probe!r} (experiment, recording = {sorting_er}): "
+            f"{[p.name for p in matches or self.nwb_paths]}"
+        )
+
+    @staticmethod
+    @functools.cache
+    def _open_nwb_zarr(path: upath.UPath) -> zarr.Group:
+        return zarr.open(path.fs.get_mapper(path.path), mode="r")
 
     @npc_io.cached_property
     def nwb_zarr(self) -> zarr.Group:
-        return zarr.open(
-            self.nwb_path.fs.get_mapper(self.nwb_path.path),
-            mode="r",
-        )
+        return self._open_nwb_zarr(self.nwb_path)
+
+    def nwb_zarr_for_sorting(self, probe: str) -> zarr.Group:
+        return self._open_nwb_zarr(self.nwb_path_for_sorting(probe))
 
     @npc_io.cached_property
     def nwb_file(self):
