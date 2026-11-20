@@ -8,13 +8,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 <!-- insertion marker -->
 ## Unreleased
 
-<small>[Compare with latest](https://github.com/AllenInstitute/npc_ephys/compare/v0.1.51...HEAD)</small>
+<small>[Compare with latest](https://github.com/AllenInstitute/npc_ephys/compare/v0.1.52...HEAD)</small>
+
+<!-- insertion marker -->
+## [v0.1.52](https://github.com/AllenInstitute/npc_ephys/releases/tag/v0.1.52) - 2026-11-18
+
+<small>[Compare with v0.1.51](https://github.com/AllenInstitute/npc_ephys/compare/v0.1.51...v0.1.52)</small>
 
 ### Added
 
 - Add specific type-ignores for UPath args (memmap, get_ephys_timing_on_pxi) ([5498530](https://github.com/AllenInstitute/npc_ephys/commit/5498530abbdbe116e20a058ef7fb5fc51a2c749c) by bjhardcastle).
 
-<!-- insertion marker -->
 ## [v0.1.51](https://github.com/AllenInstitute/npc_ephys/releases/tag/v0.1.51) - 2026-11-18
 
 <small>[Compare with v0.1.50](https://github.com/AllenInstitute/npc_ephys/compare/v0.1.50...v0.1.51)</small>
