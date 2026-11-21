@@ -8,9 +8,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 <!-- insertion marker -->
 ## Unreleased
 
-<small>[Compare with latest](https://github.com/AllenInstitute/npc_ephys/compare/v0.1.52...HEAD)</small>
+<small>[Compare with latest](https://github.com/AllenInstitute/npc_ephys/compare/v0.1.53...HEAD)</small>
+
+### Fixed
+
+- Fix loading units for probes with a single unit in nextflow (non-analyzer) sortings ([8825af1](https://github.com/AllenInstitute/npc_ephys/commit/8825af1da8c28d4023af2fbacb23b4cdea333ac5) by bjhardcastle).
 
 <!-- insertion marker -->
+## [v0.1.53](https://github.com/AllenInstitute/npc_ephys/releases/tag/v0.1.53) - 2026-11-20
+
+<small>[Compare with v0.1.52](https://github.com/AllenInstitute/npc_ephys/compare/v0.1.52...v0.1.53)</small>
+
 ## [v0.1.52](https://github.com/AllenInstitute/npc_ephys/releases/tag/v0.1.52) - 2026-11-18
 
 <small>[Compare with v0.1.51](https://github.com/AllenInstitute/npc_ephys/compare/v0.1.51...v0.1.52)</small>
