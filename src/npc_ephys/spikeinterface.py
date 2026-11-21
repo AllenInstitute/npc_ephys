@@ -614,12 +614,15 @@ class SpikeInterfaceData:
                 ][:]
             ]
         )
-        return np.argwhere(devices == npc_session.ProbeRecord(probe)).squeeze()
+        # always 1-D (a 0-d index from squeezing a single match breaks zarr indexing)
+        return np.flatnonzero(devices == npc_session.ProbeRecord(probe))
 
     def get_nwb_units_device_property(self, metric: str, probe: str) -> npt.NDArray:
-        return self.nwb_zarr_for_sorting(probe)[f"units/{metric}"][
+        # orthogonal selection along the units axis keeps the first dim even
+        # when the probe has a single unit (no squeeze)
+        return self.nwb_zarr_for_sorting(probe)[f"units/{metric}"].oindex[
             self.device_indices_in_nwb_units(probe)
-        ].squeeze()
+        ]
 
     @functools.cache
     def original_cluster_id(self, probe: str) -> npt.NDArray[np.int64]:
