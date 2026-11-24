@@ -2542,7 +2542,7 @@ wheels = [
 
 [[package]]
 name = "npc-ephys"
-version = "0.1.54"
+version = "0.1.55"
 source = { editable = "." }
 default-groups = ["bump", "linting", "task-runner", "testing"]
 dependencies = [
