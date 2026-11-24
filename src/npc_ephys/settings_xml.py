@@ -28,6 +28,7 @@ import datetime
 import functools
 import hashlib
 import io
+import re
 import xml.etree.ElementTree as ET
 from typing import Literal
 
@@ -240,7 +241,74 @@ def _probe_idx(et: ET.ElementTree) -> tuple[int, ...]:
         return tuple(idx)
 
 
+def _custom_probe_letters(
+    et: ET.ElementTree,
+) -> tuple[Literal["A", "B", "C", "D", "E", "F"], ...] | None:
+    """Probe letters from `custom_probe_name` attributes (e.g. 'ProbeB'), or None if
+    any probe is missing a name, any name is not of the form 'Probe[A-F]', or
+    letters are duplicated.
+
+    >>> _custom_probe_letters(_test_et(('ProbeA', 'ProbeB'), ((2, 1), (2, 3))))
+    ('A', 'B')
+    >>> _custom_probe_letters(_test_et(('18005108082', 'ProbeB'), ((2, 1), (2, 3)))) is None
+    True
+    >>> _custom_probe_letters(_test_et(('ProbeB', 'ProbeB'), ((2, 1), (2, 3)))) is None
+    True
+    """
+    names = tuple(probe.get("custom_probe_name") for probe in _probe_attrib_dicts(et))
+    if not names or not all(
+        name is not None and re.fullmatch("Probe[A-F]", name) for name in names
+    ):
+        return None
+    letters = tuple(name[-1] for name in names)  # type: ignore [index]
+    if len(set(letters)) != len(letters):
+        return None
+    return letters  # type: ignore [return-value]
+
+
+def _test_et(
+    custom_names: tuple[str, ...], slot_ports: tuple[tuple[int, int], ...]
+) -> ET.ElementTree:
+    """Minimal settings.xml etree for tests."""
+    probes = "".join(
+        f'<NP_PROBE slot="{s}" port="{p}" dock="1" probe_serial_number="{i}"'
+        f' probe_name="Neuropixels 1.0" custom_probe_name="{name}"/>'
+        for i, (name, (s, p)) in enumerate(zip(custom_names, slot_ports))
+    )
+    return ET.ElementTree(
+        ET.fromstring(f"<SETTINGS><EDITOR>{probes}</EDITOR></SETTINGS>")
+    )
+
+
 def _probe_letters(
+    et: ET.ElementTree,
+) -> tuple[Literal["A", "B", "C", "D", "E", "F"], ...]:
+    """Probe letters inferred from slot/port, unless every probe has a valid
+    `custom_probe_name` ('Probe[A-F]') and they disagree with the inference, in
+    which case the custom names are used.
+
+    Probe B in slot 2, port 3 with port 2 empty (slot/port inference gives 'C'):
+    >>> slot_ports = ((2, 1), (2, 3), (3, 1), (3, 2), (3, 3))
+    >>> _probe_letters(_test_et(('ProbeA', 'ProbeB', 'ProbeD', 'ProbeE', 'ProbeF'), slot_ports))
+    ('A', 'B', 'D', 'E', 'F')
+
+    Custom names missing or malformed: fall back to slot/port inference:
+    >>> _probe_letters(_test_et(('ProbeA', '18005108082', 'ProbeD', 'ProbeE', 'ProbeF'), slot_ports))
+    ('A', 'C', 'D', 'E', 'F')
+    """
+    custom_letters = _custom_probe_letters(et)
+    try:
+        inferred_letters = _inferred_probe_letters(et)
+    except ValueError:
+        if custom_letters is not None:
+            return custom_letters
+        raise
+    if custom_letters is not None and custom_letters != inferred_letters:
+        return custom_letters
+    return inferred_letters
+
+
+def _inferred_probe_letters(
     et: ET.ElementTree,
 ) -> tuple[Literal["A", "B", "C", "D", "E", "F"], ...]:
     probe_idx = _probe_idx(et)
